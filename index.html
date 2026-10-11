@@ -6,7 +6,6 @@
 <title>終わらない黄昏の谷</title>
 <style>html,body{margin:0;height:100%;overflow:hidden;background:#000}
 :root{--mincho:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif}
-#hint{position:fixed;left:16px;bottom:12px;color:#fff8;font:14px sans-serif;text-shadow:0 1px 4px #000;transition:opacity 1s}
 #sound{position:fixed;right:16px;bottom:10px;padding:4px 12px;border:1px solid #fff4;border-radius:999px;
   background:#0003;color:#fffc;font:13px sans-serif;cursor:pointer;backdrop-filter:blur(4px)}
 #sound:hover{background:#0005}
@@ -20,12 +19,8 @@
   background:#0004;color:#fffd;font:17px sans-serif;backdrop-filter:blur(4px);touch-action:none;
   -webkit-user-select:none;user-select:none}
 #pad button.held{background:#fff4;border-color:#fffa}
-#hint .touch{display:none}
 @media (pointer:coarse){
   #pad{display:flex}
-  #hint .kb,#hint .mouse{display:none}
-  #hint .touch{display:inline}
-  #hint{bottom:auto;top:calc(12px + env(safe-area-inset-top));font-size:12px;max-width:calc(100% - 150px)}
   #progress{top:calc(12px + env(safe-area-inset-top))}
   /* 物語の文は画面の真ん中に。妖精がちょうど中央にいるので、ほんの少しだけ上へ */
   #story{bottom:auto;top:40%;transform:translateY(-50%)}
@@ -53,7 +48,7 @@
 .bar{position:fixed;left:0;right:0;height:0;background:#000;z-index:4;transition:height 1.4s cubic-bezier(.6,0,.2,1);pointer-events:none}
 .bar.top{top:0}.bar.bottom{bottom:0}
 body.cinema .bar{height:12vh}
-body.cinema #hint,body.cinema #progress,body.cinema #pad,body.cinema #sound{opacity:0;visibility:hidden}
+body.cinema #progress,body.cinema #pad,body.cinema #sound{opacity:0;visibility:hidden}
 /* 場面のあいだの字幕は、下の黒帯の中に */
 body.cinema #story{top:auto;bottom:calc(6vh - .95em);transform:none;z-index:5;font-size:clamp(14px,1.8vw,20px)}
 /* 暗転 */
@@ -112,7 +107,6 @@ body.cinema #story{top:auto;bottom:calc(6vh - .95em);transform:none;z-index:5;fo
   <small>音が出ます　／　およそ十分</small>
 </div>
 <button id="skip" type="button" hidden>スキップ ›</button>
-<div id="hint"><span class="kb">WASD／矢印で妖精を飛ばす・Space で上昇・Shift で下降<br></span><span class="mouse">ドラッグで見回す／ホイールで寄る</span><span class="touch">ボタンで飛ぶ・なぞって見回す・ピンチで寄る</span></div>
 <div id="pad" aria-label="妖精の操作">
   <div class="dir">
     <button type="button" data-k="fwd" style="grid-area:f" aria-label="前へ">▲</button>

@@ -32,12 +32,14 @@
   #hint .touch{display:inline}
   #hint{bottom:auto;top:calc(12px + env(safe-area-inset-top));font-size:12px;max-width:calc(100% - 150px)}
   #progress{top:calc(12px + env(safe-area-inset-top))}
-  #story{bottom:calc(270px + env(safe-area-inset-bottom))}
+  /* 物語の文は画面の真ん中に。妖精がちょうど中央にいるので、ほんの少しだけ上へ */
+  #story{bottom:auto;top:40%;transform:translateY(-50%)}
   #sound{bottom:calc(8px + env(safe-area-inset-bottom))}
 }
 #story{position:fixed;left:16px;right:16px;bottom:22%;text-align:center;pointer-events:none;
   color:#fff8ec;font:300 clamp(15px,2vw,22px)/1.9 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
-  letter-spacing:.18em;text-shadow:0 1px 3px #000a,0 2px 22px #000c;opacity:0;transition:opacity 1.2s ease}
+  letter-spacing:.18em;text-shadow:0 1px 3px #000a,0 2px 22px #000c;opacity:0;transition:opacity 1.2s ease;
+  word-break:auto-phrase;text-wrap:balance}
 #story.on{opacity:1}
 #progress{position:fixed;right:16px;top:12px;color:#fff3dccc;font:13px "Hiragino Mincho ProN","Yu Mincho",serif;
   letter-spacing:.3em;text-shadow:0 1px 4px #000;transition:opacity 2s}

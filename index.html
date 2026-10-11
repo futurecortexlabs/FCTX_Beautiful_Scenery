@@ -5,13 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>終わらない黄昏の谷</title>
 <style>html,body{margin:0;height:100%;overflow:hidden;background:#000}
-#hint{position:fixed;left:16px;bottom:12px;color:#fff8;font:14px sans-serif;text-shadow:0 1px 4px #000}
-#caption{position:fixed;left:0;right:0;top:16%;text-align:center;pointer-events:none;
-  color:#fff6e6;font:300 clamp(16px,2.4vw,26px)/1.9 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
-  letter-spacing:.25em;text-shadow:0 2px 18px #0009;opacity:0;animation:caption 9s ease-in-out .8s forwards}
-@keyframes caption{0%{opacity:0;transform:translateY(6px)}20%,70%{opacity:1;transform:none}100%{opacity:0}}
-@media (prefers-reduced-motion: reduce){#caption{animation:caption-still 9s linear .8s forwards}}
-@keyframes caption-still{0%,85%{opacity:1}100%{opacity:0}}
+:root{--mincho:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif}
+#hint{position:fixed;left:16px;bottom:12px;color:#fff8;font:14px sans-serif;text-shadow:0 1px 4px #000;transition:opacity 1s}
 #sound{position:fixed;right:16px;bottom:10px;padding:4px 12px;border:1px solid #fff4;border-radius:999px;
   background:#0003;color:#fffc;font:13px sans-serif;cursor:pointer;backdrop-filter:blur(4px)}
 #sound:hover{background:#0005}
@@ -43,7 +38,7 @@
 #story.on{opacity:1}
 #story.fairy{color:#d4ebff}   /* 妖精自身のことば */
 #story.child{color:#ffd6dc}   /* あの子のことば */
-#title{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+#title{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   pointer-events:none;opacity:0;transition:opacity 3s ease;text-align:center;padding:0 16px;
   color:#fff8ec;font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;text-shadow:0 2px 24px #000c}
 #title.on{opacity:1}
@@ -51,7 +46,40 @@
 #title p{margin:0;font-size:clamp(13px,1.6vw,16px);letter-spacing:.25em;color:#fff3dccc}
 #progress{position:fixed;right:16px;top:12px;color:#fff3dccc;font:13px "Hiragino Mincho ProN","Yu Mincho",serif;
   letter-spacing:.3em;text-shadow:0 1px 4px #000;transition:opacity 2s}
-#progress b{font-weight:normal;color:#ffe2a8}</style>
+#progress b{font-weight:normal;color:#ffe2a8}
+
+/* ---- 映画のような演出 ---- */
+/* 上下の黒帯：場面のあいだだけ降りてくる */
+.bar{position:fixed;left:0;right:0;height:0;background:#000;z-index:4;transition:height 1.4s cubic-bezier(.6,0,.2,1);pointer-events:none}
+.bar.top{top:0}.bar.bottom{bottom:0}
+body.cinema .bar{height:12vh}
+body.cinema #hint,body.cinema #progress,body.cinema #pad,body.cinema #sound{opacity:0;visibility:hidden}
+/* 場面のあいだの字幕は、下の黒帯の中に */
+body.cinema #story{top:auto;bottom:calc(6vh - .95em);transform:none;z-index:5;font-size:clamp(14px,1.8vw,20px)}
+/* 暗転 */
+#fade{position:fixed;inset:0;background:#000;z-index:6;opacity:0;pointer-events:none;transition:opacity 1.1s ease}
+#fade.on{opacity:1;transition-duration:.01s}
+/* 幕開けの画面 */
+#start{position:fixed;inset:0;z-index:8;background:#000;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:18px;text-align:center;padding:0 16px;color:#fff8ec;font-family:var(--mincho);transition:opacity 2s}
+#start.gone{opacity:0;pointer-events:none}
+#start h1{margin:0;font-weight:300;font-size:clamp(24px,5vw,44px);letter-spacing:.3em}
+#start p{margin:0;color:#fff3dc99;letter-spacing:.3em;font-size:13px}
+#start button{margin-top:26px;padding:10px 34px;border:1px solid #fff6;border-radius:999px;background:none;
+  color:#fff8ec;font:15px var(--mincho);letter-spacing:.4em;cursor:pointer}
+#start button:hover,#start button:focus-visible{background:#fff1;outline:none;border-color:#fffc}
+#start small{color:#fff3dc66;font-size:11px;letter-spacing:.2em}
+#skip{position:fixed;right:16px;top:calc(12vh + 10px);z-index:5;padding:4px 14px;border:1px solid #fff4;border-radius:999px;
+  background:#0004;color:#fffb;font:12px sans-serif;letter-spacing:.2em;cursor:pointer}
+/* エンドロール */
+#credits{position:fixed;left:0;right:0;top:12vh;bottom:12vh;z-index:5;overflow:hidden;pointer-events:none;
+  color:#fff8ec;font-family:var(--mincho);text-align:center;text-shadow:0 2px 16px #000c}
+#credits .roll{position:absolute;left:0;right:0;top:100%}
+#credits.on .roll{animation:roll 34s linear forwards}
+@keyframes roll{to{transform:translateY(calc(-100% - 76vh))}}
+#credits p{margin:0 0 7vh;letter-spacing:.3em;font-size:clamp(13px,1.6vw,17px)}
+#credits p span{display:block;margin-bottom:6px;font-size:.75em;color:#fff3dc99}
+#credits p.big{font-size:clamp(20px,3.4vw,32px);font-weight:300}</style>
 <script type="importmap">
 {"imports":{
   "three":"https://unpkg.com/three@0.160.0/build/three.module.js",
@@ -60,14 +88,30 @@
 </script>
 </head>
 <body>
-<div id="caption">この谷に、夜は来ない。<br>水の底のほかには。</div>
+<div class="bar top"></div><div class="bar bottom"></div>
 <div id="story" role="status" aria-live="polite"></div>
 <div id="progress" aria-label="集めた記憶のかけら"></div>
 <div id="title" aria-hidden="true">
   <h1>終わらない黄昏の谷</h1>
-  <p>— おしまい —</p>
-  <p style="margin-top:28px;font-size:12px">このまま、夜の谷を飛びつづけられます</p>
+  <p id="title-sub">— おしまい —</p>
 </div>
+<div id="credits" aria-hidden="true"><div class="roll">
+  <p class="big">終わらない黄昏の谷</p>
+  <p><span>妖精</span>あなた</p>
+  <p><span>あの子</span>水の底の夜から</p>
+  <p><span>村のひとびと</span>灯りのともる窓のむこう</p>
+  <p><span>音</span>谷を渡る風と、鐘と、虫の声</p>
+  <p><span>制作</span>FutureCortex Labs</p>
+  <p class="big" style="margin-top:22vh">見てくれて、ありがとう。</p>
+</div></div>
+<div id="fade"></div>
+<div id="start">
+  <h1>終わらない黄昏の谷</h1>
+  <p>ひとつの谷と、ひとりの妖精の、みじかい物語</p>
+  <button id="begin" type="button">はじめる</button>
+  <small>音が出ます　／　およそ十分</small>
+</div>
+<button id="skip" type="button" hidden>スキップ ›</button>
 <div id="hint"><span class="kb">WASD／矢印で妖精を飛ばす・Space で上昇・Shift で下降<br></span><span class="mouse">ドラッグで見回す／ホイールで寄る</span><span class="touch">ボタンで飛ぶ・なぞって見回す・ピンチで寄る</span></div>
 <div id="pad" aria-label="妖精の操作">
   <div class="dir">
@@ -328,6 +372,9 @@ for (let i = 0; i < 8; i++) {
   });
 }
 const nearVillage = (x, z) => VILLAGE.some(v => Math.hypot(x - v.x, z - v.z) < 11);
+// 風車は開けた草地に立っている
+const MILL = { x: 80, z: -30 };
+const nearMill = (x, z) => Math.hypot(x - MILL.x, z - MILL.z) < 30;
 
 const dummy = new THREE.Object3D();
 const palette = ['#2f5d24', '#3f7330', '#58843c', '#6b8f45', '#8a6a3a'].map(c => new THREE.Color(c));
@@ -338,7 +385,7 @@ for (let tries = 0; tries < CFG.treeCount * 5 && placed < CFG.treeCount; tries++
   const h = heightAt(x, z);
   const dLake = Math.hypot(x - LAKE.x, z - LAKE.z);
   if (h < 10 || h > 110 || dLake < LAKE.r * 1.05) continue;
-  if (Math.hypot(x - VIEW.x, z - VIEW.z) < 45 || distToViewLine(x, z) < 30 || nearVillage(x, z)) continue;
+  if (Math.hypot(x - VIEW.x, z - VIEW.z) < 45 || distToViewLine(x, z) < 30 || nearVillage(x, z) || nearMill(x, z)) continue;
   const s = 0.6 + Math.random() * 0.9;
   dummy.position.set(x, h, z);
   dummy.rotation.y = Math.random() * Math.PI * 2;
@@ -529,7 +576,7 @@ for (let i = 0; i < 4; i++) {
   sails.add(arm);
 }
 mill.add(millBody, millCap, sails);
-const millX = 80, millZ = -30;
+const millX = MILL.x, millZ = MILL.z;
 mill.position.set(millX, heightAt(millX, millZ), millZ);
 mill.rotation.y = Math.atan2(camera.position.x - millX, camera.position.z - millZ);
 mill.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -725,6 +772,7 @@ canopy.position.y = 3.6;
 umbrella.add(umbrellaPole, canopy);
 umbrella.position.set(umbrellaX, Math.max(heightAt(umbrellaX, umbrellaZ), CFG.lakeLevel), umbrellaZ);
 umbrella.rotation.set(0.25, 0.8, 0.1);
+umbrella.scale.setScalar(0.6);  // 子どもの傘の大きさ
 umbrella.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
 relics.add(umbrella);
 
@@ -848,11 +896,16 @@ function updateFairy(t, dt) {
   if (keys.has('up')) wish.y += 12;
   if (keys.has('down')) wish.y -= 12;
 
-  // 結末の場面では、妖精はひとりでにあの子のそばへ飛んでいく
-  const autopilot = ending.phase !== 'none' && ending.phase !== 'after';
+  // 場面のあいだは、妖精はひとりでに動く（行き先がなければ、その場に浮かぶ）
+  const autopilot = inScene();
   if (autopilot) {
-    wish.copy(fairyGoal).sub(fairy.position).multiplyScalar(1.2);
-    if (wish.length() > 16) wish.setLength(16);
+    const goal = director.shots ? director.fairyGoal : fairyGoal;
+    if (goal) {
+      wish.copy(goal).sub(fairy.position).multiplyScalar(1.2);
+      if (wish.length() > 16) wish.setLength(16);
+    } else {
+      wish.set(0, 0, 0);
+    }
   } else if (keys.size) {
     controls.autoRotate = false;
     lastTouch = t;
@@ -1003,7 +1056,7 @@ const orbs = MEMORIES.map((m) => {
   group.add(glow, core, beam);
   group.position.copy(m.pos);
   scene.add(group);
-  return { ...m, group, glow, beam, state: 'idle', t: 0 };
+  return { ...m, memory: m, group, glow, beam, state: 'idle', t: 0 };
 });
 
 // 鐘楼：すべてのかけらが揃うと、鐘へ導く光が立つ
@@ -1027,10 +1080,8 @@ function collect(o) {
   fairyLight.intensity += 1.5;
   fairyHalo.scale.addScalar(0.5);
   dustTint.lerp(new THREE.Color(0xffe2a8), 0.25);
-  narrate(...o.text);
-  if (found === MEMORIES.length) {
-    narrate('すべてのかけらが、ここにある。', () => { bellReady = true; }, '鐘楼へ。止まった鐘のところへ。');
-  }
+  hush();
+  playMemory(o);
 }
 
 function ringTheBell() {
@@ -1040,15 +1091,29 @@ function ringTheBell() {
   audio?.bellClear();
   setTimeout(() => audio?.nightfall(), 3500);
   progressEl.style.opacity = 0;
-  following = true; followDist = 55; zoomIn = true;  // 夜が来るのを見わたせるよう、少し引く
+  hush();
   narrate(
     '鐘が鳴った。',
     fairy_('時を止めていたのは、わたしだった。'),
     fairy_('夜が来れば、みんなのいない夜になってしまうと思ったから。'),
     'けれど、水の底の夜には、ずっと灯りがともっていた。',
     fairy_('待っていたのは、わたしだけじゃなかった。'),
-    () => startEnding(),
+    release,
   );
+  const a0 = Math.atan2(camera.position.x - bellWorld.x, camera.position.z - bellWorld.z);
+  playShots([
+    // 揺れる鐘に寄る
+    {
+      cut: true, dur: 6.5,
+      cam: (t, out) => {
+        const a = a0 + t * 0.06;
+        out.pos.set(bellWorld.x + Math.sin(a) * 9, bellWorld.y - 1.5, bellWorld.z + Math.cos(a) * 9);
+        out.look.copy(bellWorld);
+      },
+    },
+    // 谷の上空から、夜が降りてくるのを見わたす
+    { cut: true, dur: null, tail: 1, cam: orbit(V(LAKE.x, 10, LAKE.z), 140, 80, a0, 0.02, 45) },
+  ], () => startEnding());
 }
 
 function updateStory(t, dt) {
@@ -1056,7 +1121,7 @@ function updateStory(t, dt) {
     if (o.state === 'idle') {
       o.group.position.y = o.pos.y + Math.sin(t * 1.5 + o.pos.x) * 0.4;
       o.glow.material.opacity = 0.6 + Math.sin(t * 2 + o.pos.z) * 0.2;
-      if (fairy.position.distanceTo(o.group.position) < 4.5) collect(o);
+      if (!inScene() && fairy.position.distanceTo(o.group.position) < 4.5) collect(o);
     } else if (o.state === 'flying') {
       // 妖精の胸へ吸いこまれていく
       o.t += dt / 0.9;
@@ -1067,7 +1132,7 @@ function updateStory(t, dt) {
     }
   }
 
-  const nearBell = fairy.position.distanceTo(bellWorld) < 7;
+  const nearBell = !inScene() && fairy.position.distanceTo(bellWorld) < 7;
   if (bellReady && !bellRung) {
     towerBeam.material.opacity = 0.14 + Math.sin(t * 2) * 0.05;
     if (nearBell) ringTheBell();
@@ -1092,47 +1157,58 @@ function updateStory(t, dt) {
 }
 
 // ---------- 結末：水の底の夜から、あの子が傘を取りに来る ----------
-const kid = new THREE.Group();
+// 人の姿：あの子にも、回想に出てくる光る人影にも使う。腕は肩を支点に回す
+function makeFigure(m, scale = 1) {
+  const root = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(body);
+  const legs = [-0.12, 0.12].map((x) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.4, 6).translate(0, -0.2, 0), m.skin);
+    leg.position.set(x, 0.4, 0);
+    body.add(leg);
+    return leg;
+  });
+  const dress = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.95, 12).translate(0, 0.47, 0), m.dress);
+  dress.position.y = 0.35;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), m.skin);
+  head.position.y = 1.55;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), m.hair);
+  hair.position.set(0, 1.58, -0.03);
+  hair.rotation.x = -0.3;
+  body.add(dress, head, hair);
+  if (m.eye) {
+    for (const x of [-0.085, 0.085]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), m.eye);
+      eye.position.set(x, 1.57, 0.235);
+      body.add(eye);
+    }
+  }
+  const [armL, armR] = [-1, 1].map((side) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.24, 1.22, 0);
+    pivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.1).translate(0, -0.27, 0), m.skin));
+    body.add(pivot);
+    return pivot;
+  });
+  root.scale.setScalar(scale);
+  return { root, body, legs, armL, armR };
+}
+
 const kidMats = [];
 const kidMat = (opts) => {
   const m = new THREE.MeshStandardMaterial({ roughness: 0.8, transparent: true, opacity: 0, ...opts });
   kidMats.push(m);
   return m;
 };
-const kidDress = kidMat({ color: 0xf0e4cf, emissive: 0x3a3428 });
-const kidSkin = kidMat({ color: 0xf6d7bf, emissive: 0x4a3426 });
-const kidHair = kidMat({ color: 0x4a3426 });
-const kidBody = new THREE.Group();
-kid.add(kidBody);
-const kidLegs = [-0.12, 0.12].map((x) => {
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.4, 6).translate(0, -0.2, 0), kidSkin);
-  leg.position.set(x, 0.4, 0);
-  kidBody.add(leg);
-  return leg;
+// 右手で傘を、左手で小さな灯りを持つ
+const kidFig = makeFigure({
+  dress: kidMat({ color: 0xf0e4cf, emissive: 0x3a3428 }),
+  skin: kidMat({ color: 0xf6d7bf, emissive: 0x4a3426 }),
+  hair: kidMat({ color: 0x4a3426 }),
+  eye: kidMat({ color: 0x2a1c14, roughness: 0.4 }),
 });
-const kidDressMesh = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.95, 12).translate(0, 0.47, 0), kidDress);
-kidDressMesh.position.y = 0.35;
-const kidHead = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), kidSkin);
-kidHead.position.y = 1.55;
-const kidHairMesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), kidHair);
-kidHairMesh.position.set(0, 1.58, -0.03);
-kidHairMesh.rotation.x = -0.3;
-kidBody.add(kidDressMesh, kidHead, kidHairMesh);
-const kidEyeMat = kidMat({ color: 0x2a1c14, roughness: 0.4 });
-for (const x of [-0.085, 0.085]) {
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), kidEyeMat);
-  eye.position.set(x, 1.57, 0.235);
-  kidBody.add(eye);
-}
-// 腕：肩を支点に回す。右手で傘を、左手で小さな灯りを持つ
-const kidArms = [-1, 1].map((side) => {
-  const pivot = new THREE.Group();
-  pivot.position.set(side * 0.24, 1.22, 0);
-  pivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.1).translate(0, -0.27, 0), kidSkin));
-  kidBody.add(pivot);
-  return pivot;
-});
-const [kidLeftArm, kidRightArm] = kidArms;
+const kid = kidFig.root, kidBody = kidFig.body, kidLegs = kidFig.legs;
+const kidLeftArm = kidFig.armL, kidRightArm = kidFig.armR;
 const kidLamp = new THREE.Group();
 kidLamp.position.set(0, -0.6, 0.05);
 const kidLampGlass = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8),
@@ -1166,13 +1242,26 @@ function startEnding() {
   keys.clear();
 }
 
+function showTitle(sub, ms) {
+  document.getElementById('title-sub').textContent = sub;
+  titleEl.classList.add('on');
+  setTimeout(() => titleEl.classList.remove('on'), ms);
+}
+
+const creditsEl = document.getElementById('credits');
+function rollCredits() {
+  creditsEl.classList.add('on');
+  creditsEl.querySelector('.roll').addEventListener('animationend', finishEnding, { once: true });
+}
+
 function finishEnding() {
   ending.phase = 'after';
-  titleEl.classList.remove('on');
-  controls.enabled = true;
+  creditsEl.classList.remove('on');
+  cinema(false);
   // 谷を見わたす眺めのまま手を離す。また飛ばしはじめたら、妖精を追いかける
   following = false; followDist = 22;
   lastTouch = elapsed;
+  narrate('このまま、夜の谷を飛びつづけられます。');
 }
 
 function updateEnding(t, dt) {
@@ -1199,7 +1288,7 @@ function updateEnding(t, dt) {
       ending.phase = 'promise';
       ending.holding = true;
       kidLegs.forEach((l) => { l.rotation.x = 0; });
-      for (const [i, n] of [0, 2, 4, 3].entries()) setTimeout(() => audio?.chime(n), i * 450);
+      audio?.motif(true);
       narrate(
         child_('きのうの傘、取りに来たよ。'),
         () => { ending.waving = true; },
@@ -1212,9 +1301,9 @@ function updateEnding(t, dt) {
         },
         '谷に、やっと夜が来た。',
         () => {
-          titleEl.classList.add('on');
-          for (const [i, n] of [4, 2, 0].entries()) setTimeout(() => audio?.chime(n), 600 + i * 700);
-          setTimeout(finishEnding, 11000);
+          showTitle('— おしまい —', 8000);
+          audio?.motif();
+          setTimeout(rollCredits, 9500);
         },
       );
     }
@@ -1269,9 +1358,320 @@ function updateEnding(t, dt) {
   camera.position.lerp(camGoal, k);
 }
 
-setTimeout(() => {
-  if (found === 0) narrate('谷のあちこちに、光るかけらが残っている。', '妖精を飛ばして、拾い集めよう。');
-}, 10500);
+// ---------- 演出：短い映画のように撮る ----------
+// 場面（shot）を順に流す。dur が null の場面は、release() が呼ばれてから tail 秒で終わる。
+// cut: true の場面は暗転から切り替わり、chase があればカメラはその速さで目標を追う
+const director = { shots: null, i: 0, t: 0, tailT: null, released: false, onDone: null, fairyGoal: null };
+const skipBtn = document.getElementById('skip');
+const fadeEl = document.getElementById('fade');
+const camWant = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
+const inScene = () => director.shots !== null || (ending.phase !== 'none' && ending.phase !== 'after');
+
+function cinema(on) {
+  document.body.classList.toggle('cinema', on);
+  controls.enabled = !on;
+  if (on) { controls.autoRotate = false; keys.clear(); }
+}
+function dipToBlack() {
+  fadeEl.classList.add('on');
+  setTimeout(() => fadeEl.classList.remove('on'), 40);
+}
+function hush() {
+  lines.length = 0;
+  storyEl.classList.remove('on');
+}
+function release() { director.released = true; }
+
+function playShots(shots, onDone, { skippable = false } = {}) {
+  cinema(true);
+  Object.assign(director, { shots, i: 0, released: false, onDone, fairyGoal: null });
+  skipBtn.hidden = !skippable;
+  beginShot();
+}
+function beginShot() {
+  const s = director.shots[director.i];
+  director.t = 0;
+  director.tailT = null;
+  s.enter?.();
+  if (s.cut) {
+    dipToBlack();
+    s.cam(0, camWant);
+    camera.position.copy(camWant.pos);
+    controls.target.copy(camWant.look);
+  }
+}
+function finishShots() {
+  const done = director.onDone;
+  director.shots = null;
+  skipBtn.hidden = true;
+  done?.();
+}
+skipBtn.addEventListener('click', () => {
+  if (!director.shots) return;
+  hush();
+  director.shots[director.i].exit?.();
+  dipToBlack();
+  finishShots();
+});
+// 場面の入り（1.6 秒で浮かぶ）と終わり（tail のあいだに消える）の濃さ
+function shotFade(t, tail) {
+  const fin = Math.min(t / 1.6, 1);
+  const fout = director.tailT === null ? 1 : Math.max(0, 1 - (t - director.tailT) / tail);
+  return fin * fout;
+}
+function updateDirector(dt) {
+  if (!director.shots) return;
+  const s = director.shots[director.i];
+  director.t += dt;
+  s.cam(director.t, camWant);
+  const k = s.chase ? 1 - Math.exp(-dt * s.chase) : 1;
+  camera.position.lerp(camWant.pos, k);
+  controls.target.lerp(camWant.look, k);
+  s.update?.(director.t, dt);
+  let over = s.dur != null && director.t >= s.dur;
+  if (s.dur == null && director.released) {
+    if (director.tailT === null) director.tailT = director.t;
+    over = director.t - director.tailT >= (s.tail ?? 1.5);
+  }
+  if (!over) return;
+  s.exit?.();
+  if (++director.i < director.shots.length) beginShot();
+  else finishShots();
+}
+
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const ease = (p) => THREE.MathUtils.smootherstep(p, 0, 1);
+const groundY = (x, z) => Math.max(heightAt(x, z), CFG.lakeLevel);
+const faceTo = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
+// from から to へ、dur 秒かけてゆっくり動くカメラ
+function dolly(from, to, lookFrom, lookTo, dur) {
+  return (t, out) => {
+    const p = ease(Math.min(t / dur, 1));
+    out.pos.lerpVectors(from, to, p);
+    out.look.lerpVectors(lookFrom, lookTo, p);
+  };
+}
+// center のまわりを、半径 radius・高さ height でゆっくり巡るカメラ（地面からは clear 以上離す）
+function orbit(center, radius, height, a0, speed, clear = 4) {
+  return (t, out) => {
+    const a = a0 + t * speed;
+    out.pos.set(center.x + Math.sin(a) * radius, 0, center.z + Math.cos(a) * radius);
+    out.pos.y = Math.max(center.y + height, heightAt(out.pos.x, out.pos.z) + clear);
+    out.look.copy(center);
+  };
+}
+
+// ---- 幕開け ----
+const PLAY_VIEW = { pos: camera.position.clone(), look: controls.target.clone() };
+const PROLOGUE = [
+  // 空の高みから、黄昏の谷を見下ろす
+  { cut: true, dur: 11, cam: dolly(V(-430, 240, 430), V(-300, 160, 300), V(-40, 40, 0), V(-40, 18, 0), 11) },
+  // 湖へ降りていき、水の底の夜をのぞきこむ
+  { cut: true, dur: null, tail: 1.5, cam: dolly(V(-150, 26, 125), V(-100, 13, 85), V(-40, 4, 30), V(-25, -30, -5), 15) },
+  // 草原に浮かぶ、ひとりの妖精
+  {
+    cut: true, dur: 8,
+    cam: (t, out) => {
+      const a = 2.3 + t * 0.07;
+      out.pos.set(fairy.position.x + Math.sin(a) * 5, fairy.position.y + 1.1, fairy.position.z + Math.cos(a) * 5);
+      out.look.copy(fairy.position).y += 0.45;
+    },
+    enter: () => showTitle('', 6500),
+  },
+  // いつもの眺めへ
+  { dur: 4, chase: 1.6, cam: (t, out) => { out.pos.copy(PLAY_VIEW.pos); out.look.copy(PLAY_VIEW.look); } },
+];
+function beginStory() {
+  playShots(PROLOGUE, () => {
+    cinema(false);
+    lastTouch = elapsed;
+    narrate('谷のあちこちに、光るかけらが残っている。', '妖精を飛ばして、拾い集めよう。');
+  }, { skippable: true });
+  narrate(
+    'むかし、この谷にも、夜があった。',
+    'ある夕暮れを最後に、夜は来なくなった。',
+    'この谷に、夜は来ない。',
+    '水の底のほかには。',
+    release,
+  );
+  setTimeout(() => audio?.motif(), 1500);
+}
+// 「はじめる」：音を出す許可もこのとき得る
+const startEl = document.getElementById('start');
+document.getElementById('begin').addEventListener('click', () => {
+  startAudio();
+  startEl.classList.add('gone');
+  beginStory();
+}, { once: true });
+// 幕が上がる前から、最初の場面の位置で待っておく
+PROLOGUE[0].cam(0, camWant);
+camera.position.copy(camWant.pos);
+controls.target.copy(camWant.look);
+document.body.classList.add('cinema');
+controls.enabled = false;
+
+// ---- 回想：かけらを拾うと、その場所の記憶が光る人影になって浮かぶ ----
+function makeGhost(scale = 1) {
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffe7c2, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const f = makeFigure({ skin: mat, dress: mat, hair: mat }, scale);
+  const glow = haloSprite(0xffd9a0, 3.2, 0);
+  glow.position.y = 1;
+  f.body.add(glow);
+  f.fade = (a) => { mat.opacity = 0.5 * a; glow.material.opacity = 0.3 * a; };
+  f.place = (p, face) => { f.root.position.set(p.x, groundY(p.x, p.z), p.z); f.root.rotation.y = face; };
+  scene.add(f.root);
+  return f;
+}
+// むかしの妖精：小さな青白い光
+function makeSpark() {
+  const s = haloSprite(0xd8f0ff, 1.6, 0);
+  scene.add(s);
+  return s;
+}
+const dirFromLake = (p) => V(p.x - LAKE.x, 0, p.z - LAKE.z).normalize();
+const sideOf = (d) => V(d.z, 0, -d.x);
+
+MEMORIES[0].vignette = () => {
+  // 灯籠に火を入れる子どもたち
+  const base = nearestLantern.pos.clone();
+  base.y = groundY(base.x, base.z);
+  const out = dirFromLake(base), side = sideOf(out);
+  const a = makeGhost(), b = makeGhost(0.85), s = makeSpark();
+  const pa = base.clone().addScaledVector(side, 1).addScaledVector(out, 0.5);
+  const pb = base.clone().addScaledVector(side, -1.4).addScaledVector(out, 1.4);
+  a.place(pa, faceTo(pa, base));
+  b.place(pb, faceTo(pb, pa));
+  const by = b.root.position.y;
+  return {
+    center: base.clone().setY(base.y + 1.6), radius: 12, height: 3, a0: Math.atan2(-out.x, -out.z),
+    update(t, f) {
+      a.fade(f); b.fade(f); s.material.opacity = 0.9 * f;
+      a.armR.rotation.x = -2.5 + Math.sin(t * 1.5) * 0.15;
+      b.root.position.y = by + Math.abs(Math.sin(t * 3.2)) * 0.3;
+      b.armL.rotation.z = -2.2 + Math.sin(t * 6) * 0.3;
+      s.position.set(base.x + Math.cos(t * 1.3) * 1.4, base.y + 2.6 + Math.sin(t * 2.6) * 0.25, base.z + Math.sin(t * 1.3) * 1.4);
+    },
+    dispose() { scene.remove(a.root, b.root, s); },
+  };
+};
+
+MEMORIES[1].vignette = () => {
+  // 「あした、取りに来るね」と手を振って、帰っていくあの子
+  const base = umbrella.position.clone();
+  const out = dirFromLake(base), side = sideOf(out);
+  const g = makeGhost(), s = makeSpark();
+  const start = base.clone().addScaledVector(side, 0.9);
+  const sp = base.clone().addScaledVector(side, -0.9).addScaledVector(out, -0.4);
+  sp.y = groundY(sp.x, sp.z) + 1.8;
+  return {
+    center: base.clone().setY(base.y + 1.2), radius: 13, height: 3.5, a0: Math.atan2(-out.x, -out.z) - 0.5,
+    update(t, f) {
+      const leave = Math.max(0, t - 6);
+      const p = start.clone().addScaledVector(out, leave * 0.9);
+      g.place(p, leave > 0 ? faceTo(base, base.clone().add(out)) : faceTo(start, sp));
+      g.fade(f * Math.max(0, 1 - leave / 9));
+      g.armL.rotation.z = leave > 0 ? 0 : -2.3 + Math.sin(t * 6) * 0.35;
+      const step = leave > 0 ? Math.sin(t * 7) * 0.5 : 0;
+      g.legs[0].rotation.x = step; g.legs[1].rotation.x = -step;
+      s.material.opacity = 0.9 * f;
+      s.position.copy(sp).y += Math.sin(t * 2) * 0.15;
+    },
+    dispose() { scene.remove(g.root, s); },
+  };
+};
+
+MEMORIES[2].vignette = () => {
+  // パン屋の戸口で、パンのかけらを受け取り、妖精に分けるあの子
+  const base = new THREE.Vector3(ruinSite.x, 0, ruinSite.z);
+  base.y = groundY(base.x, base.z);
+  const face = Math.atan2(LAKE.x - base.x, LAKE.z - base.z);
+  const fwd = V(Math.sin(face), 0, Math.cos(face)), side = sideOf(fwd);
+  const adult = makeGhost(1.45), g = makeGhost(), s = makeSpark();
+  const pa = base.clone().addScaledVector(fwd, 2.2), pk = base.clone().addScaledVector(fwd, 4.2);
+  adult.place(pa, face);
+  g.place(pk, face + Math.PI);
+  const win = haloSprite(0xffc27a, 4, 0);  // 窓からこぼれる灯り
+  win.position.copy(base).addScaledVector(fwd, 3).addScaledVector(side, 2).y += 2.3;
+  const bread = haloSprite(0xffe2b0, 0.9, 0);
+  const sp = pk.clone().addScaledVector(side, 1.1);
+  sp.y = groundY(sp.x, sp.z) + 1.5;
+  scene.add(win, bread);
+  const hand = (p) => V(p.x, groundY(p.x, p.z) + 1.1, p.z);
+  return {
+    center: base.clone().addScaledVector(fwd, 3).setY(base.y + 1.6), radius: 11, height: 3.5, a0: face + 0.6,
+    update(t, f) {
+      adult.fade(f); g.fade(f); s.material.opacity = 0.9 * f;
+      win.material.opacity = 0.6 * f; bread.material.opacity = 0.9 * f;
+      adult.armR.rotation.x = t > 1.5 && t < 4.5 ? -1.2 : 0;
+      g.armR.rotation.x = t > 2 && t < 6 ? -1.2 : 0;
+      // パンは、大人の手からあの子へ、あの子から妖精へ
+      const ha = hand(pa.clone().addScaledVector(fwd, 0.6)), hk = hand(pk.clone().addScaledVector(fwd, -0.6));
+      if (t < 2.5) bread.position.copy(ha);
+      else if (t < 4) bread.position.lerpVectors(ha, hk, ease((t - 2.5) / 1.5));
+      else if (t < 6) bread.position.copy(hk);
+      else bread.position.lerpVectors(hk, sp, ease(Math.min((t - 6) / 1.5, 1)));
+      if (t > 5.5) g.root.rotation.y = lerp(g.root.rotation.y, faceTo(pk, sp), 0.05);
+      g.armL.rotation.x = t > 5.5 && t < 8 ? -1.3 : 0;
+      s.position.copy(sp).y += Math.sin(t * 2) * 0.12;
+    },
+    dispose() { scene.remove(adult.root, g.root, s, win, bread); },
+  };
+};
+
+MEMORIES[3].vignette = () => {
+  // 回りだした風車のまわりを、両手を広げて駆けまわる子どもたち
+  const base = mill.position.clone();
+  const kids = [makeGhost(), makeGhost(0.9), makeGhost(0.95)];
+  const s = makeSpark();
+  return {
+    center: base.clone().setY(base.y + 6), radius: 24, height: 5,
+    update(t, f) {
+      kids.forEach((g, i) => {
+        const a = t * 0.7 + (i * Math.PI * 2) / 3;
+        const p = V(base.x + Math.sin(a) * 7.5, 0, base.z + Math.cos(a) * 7.5);
+        g.place(p, Math.atan2(Math.cos(a), -Math.sin(a)));
+        g.fade(f);
+        g.armL.rotation.z = -1.3; g.armR.rotation.z = 1.3;
+        const step = Math.sin(t * 10 + i) * 0.6;
+        g.legs[0].rotation.x = step; g.legs[1].rotation.x = -step;
+      });
+      const a = t * 0.7 - 0.5;
+      s.position.set(base.x + Math.sin(a) * 7.5, groundY(base.x, base.z) + 2.2, base.z + Math.cos(a) * 7.5);
+      s.material.opacity = 0.9 * f;
+    },
+    dispose() { scene.remove(...kids.map((g) => g.root), s); },
+  };
+};
+
+const sceneFairyGoal = new THREE.Vector3();
+function playMemory(o) {
+  const v = o.memory.vignette();
+  // 撮る向きは記憶ごとに決めておく（なければ、いまのカメラの側から）
+  const a0 = v.a0 ?? Math.atan2(camera.position.x - v.center.x, camera.position.z - v.center.z);
+  const cam = orbit(v.center, v.radius, v.height, a0, 0.045);
+  narrate(...o.text, release);
+  playShots([{
+    dur: null, tail: 2.2, chase: 1.1, cam,
+    update(t) {
+      v.update(t, shotFade(t, 2.2));
+      // 妖精は、記憶の少し上、画面の端から、それを見まもる
+      const toCam = V(camera.position.x - v.center.x, 0, camera.position.z - v.center.z).normalize();
+      director.fairyGoal = sceneFairyGoal.copy(v.center).addScaledVector(sideOf(toCam), 3.2)
+        .addScaledVector(toCam, 1.5).setY(v.center.y + 2.4);
+    },
+    exit: () => v.dispose(),
+  }], () => {
+    cinema(false);
+    audio?.motif(true);
+    following = true; zoomIn = true; followDist = 22;
+    lastTouch = elapsed;
+    if (found === MEMORIES.length) {
+      narrate('すべてのかけらが、ここにある。', () => { bellReady = true; }, '鐘楼へ。止まった鐘のところへ。');
+    }
+  });
+}
 
 // ---------- 音（最初に触れたときから鳴りはじめる） ----------
 // 風の音と、ときおり水の底から聞こえてくる鐘。すべてその場で合成する
@@ -1392,7 +1792,31 @@ function startAudio() {
     setTimeout(cricket, 6000);
   }
 
-  audio = { ctx, master, chime, bellClear, nightfall };
+  // 主題の旋律：オルゴールのように。幕開け・回想・結末でくり返し流れる
+  const MOTIF = [
+    [440, 1], [523.25, 1], [587.33, 2], [523.25, 1], [440, 1], [392, 2],
+    [349.23, 1], [392, 1], [440, 1], [523.25, 1], [440, 4],
+  ];
+  function musicBoxNote(freq, when) {
+    for (const [mul, amp, len] of [[1, 0.09, 2.6], [2, 0.025, 1.2], [3.01, 0.008, 0.6]]) {
+      const osc = ctx.createOscillator(), env = ctx.createGain();
+      osc.frequency.value = freq * mul;
+      env.gain.setValueAtTime(0, when);
+      env.gain.linearRampToValueAtTime(amp, when + 0.006);
+      env.gain.exponentialRampToValueAtTime(0.0001, when + len);
+      osc.connect(env).connect(clear);
+      osc.start(when); osc.stop(when + len + 0.1);
+    }
+  }
+  function motif(short = false, beat = 0.46) {
+    let when = ctx.currentTime + 0.05;
+    for (const [freq, beats] of short ? MOTIF.slice(0, 6) : MOTIF) {
+      musicBoxNote(freq, when);
+      when += beats * beat;
+    }
+  }
+
+  audio = { ctx, master, chime, bellClear, nightfall, motif };
   soundBtn.hidden = false;
 }
 addEventListener('pointerdown', startAudio, { once: true });
@@ -1434,6 +1858,7 @@ renderer.setAnimationLoop(() => {
   updateFairy(t, dt);
   updateStory(t, dt);
   updateEnding(t, dt);
+  updateDirector(dt);
   applyWorld(worldNight, false);
   elapsed = t;
 

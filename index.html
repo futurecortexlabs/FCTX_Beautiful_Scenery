@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>終わらない黄昏の谷</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}
+#hint{position:fixed;left:16px;bottom:12px;color:#fff8;font:14px sans-serif;text-shadow:0 1px 4px #000}
+#caption{position:fixed;left:0;right:0;top:16%;text-align:center;pointer-events:none;
+  color:#fff6e6;font:300 clamp(16px,2.4vw,26px)/1.9 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  letter-spacing:.25em;text-shadow:0 2px 18px #0009;opacity:0;animation:caption 9s ease-in-out .8s forwards}
+@keyframes caption{0%{opacity:0;transform:translateY(6px)}20%,70%{opacity:1;transform:none}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){#caption{animation:caption-still 9s linear .8s forwards}}
+@keyframes caption-still{0%,85%{opacity:1}100%{opacity:0}}
+#sound{position:fixed;right:16px;bottom:10px;padding:4px 12px;border:1px solid #fff4;border-radius:999px;
+  background:#0003;color:#fffc;font:13px sans-serif;cursor:pointer;backdrop-filter:blur(4px)}
+#sound:hover{background:#0005}
+#pad{display:none;position:fixed;left:0;right:0;bottom:calc(44px + env(safe-area-inset-bottom));
+  padding:0 max(16px, env(safe-area-inset-left)) 0 max(16px, env(safe-area-inset-right));justify-content:space-between;
+  align-items:flex-end;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#pad .dir{display:grid;grid-template-areas:". f ." "l . r" ". b .";grid-template-columns:repeat(3,56px);grid-auto-rows:56px;gap:4px}
+#pad .alt{display:grid;gap:12px}
+#pad button{pointer-events:auto;width:56px;height:56px;border-radius:50%;border:1px solid #fff6;
+  background:#0004;color:#fffd;font:17px sans-serif;backdrop-filter:blur(4px);touch-action:none;
+  -webkit-user-select:none;user-select:none}
+#pad button.held{background:#fff4;border-color:#fffa}
+#hint .touch{display:none}
+@media (pointer:coarse){
+  #pad{display:flex}
+  #hint .kb,#hint .mouse{display:none}
+  #hint .touch{display:inline}
+  #hint{bottom:auto;top:calc(12px + env(safe-area-inset-top));font-size:12px;max-width:calc(100% - 150px)}
+  #progress{top:calc(12px + env(safe-area-inset-top))}
+  #story{bottom:calc(270px + env(safe-area-inset-bottom))}
+  #sound{bottom:calc(8px + env(safe-area-inset-bottom))}
+}
+#story{position:fixed;left:16px;right:16px;bottom:22%;text-align:center;pointer-events:none;
+  color:#fff8ec;font:300 clamp(15px,2vw,22px)/1.9 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  letter-spacing:.18em;text-shadow:0 1px 3px #000a,0 2px 22px #000c;opacity:0;transition:opacity 1.2s ease}
+#story.on{opacity:1}
+#progress{position:fixed;right:16px;top:12px;color:#fff3dccc;font:13px "Hiragino Mincho ProN","Yu Mincho",serif;
+  letter-spacing:.3em;text-shadow:0 1px 4px #000;transition:opacity 2s}
+#progress b{font-weight:normal;color:#ffe2a8}</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="caption">この谷に、夜は来ない。<br>水の底のほかには。</div>
+<div id="story" role="status" aria-live="polite"></div>
+<div id="progress" aria-label="集めた記憶のかけら"></div>
+<div id="hint"><span class="kb">WASD／矢印で妖精を飛ばす・Space で上昇・Shift で下降<br></span><span class="mouse">ドラッグで見回す／ホイールで寄る</span><span class="touch">ボタンで飛ぶ・なぞって見回す・ピンチで寄る</span></div>
+<div id="pad" aria-label="妖精の操作">
+  <div class="dir">
+    <button type="button" data-k="fwd" style="grid-area:f" aria-label="前へ">▲</button>
+    <button type="button" data-k="left" style="grid-area:l" aria-label="左へ">◀</button>
+    <button type="button" data-k="right" style="grid-area:r" aria-label="右へ">▶</button>
+    <button type="button" data-k="back" style="grid-area:b" aria-label="後ろへ">▼</button>
+  </div>
+  <div class="alt">
+    <button type="button" data-k="up" aria-label="上昇">上</button>
+    <button type="button" data-k="down" aria-label="下降">下</button>
+  </div>
+</div>
+<button id="sound" type="button" aria-pressed="true" hidden>音：あり</button>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+
+// ---------- 設定（ここを動かすと印象が大きく変わる） ----------
+const CFG = {
+  sunElevation: 5,        // 太陽の高さ（低いほど夕暮れ感）
+  sunAzimuth: 235,        // 太陽の方位
+  haze: 0xf2c9a0,         // 遠景の霞色（夕焼けの金色）
+  lakeLevel: 5,
+  treeCount: 3500,
+};
+// スマホ・タブレットでは描画を少し軽くする
+const TOUCH = matchMedia('(pointer: coarse)').matches;
+
+// ---------- Renderer / Scene / Camera ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(CFG.haze, 180, 1100); // 遠いほど空色・霞色になじむ
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(-130, 46, 150);  // 湖を見下ろす草原から
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(-35, 6, 10);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minDistance = 4;   // 妖精に寄れるように
+controls.maxDistance = 500;
+
+// ---------- Sky（夕暮れの大気） ----------
+const sky = new Sky();
+sky.scale.setScalar(10000);
+scene.add(sky);
+const su = sky.material.uniforms;
+su.turbidity.value = 8;          // 大気の濁り → 柔らかい光
+su.rayleigh.value = 2.2;         // 青の散乱を抑え、暖色寄りに
+su.mieCoefficient.value = 0.02;  // 太陽の周りのにじみ
+su.mieDirectionalG.value = 0.9;
+
+const sunDir = new THREE.Vector3().setFromSphericalCoords(
+  1,
+  THREE.MathUtils.degToRad(90 - CFG.sunElevation),
+  THREE.MathUtils.degToRad(CFG.sunAzimuth)
+);
+su.sunPosition.value.copy(sunDir);
+
+// ---------- Lights（金色の斜光＋やわらかい空の環境光） ----------
+const sunLight = new THREE.DirectionalLight(0xffc27a, 2.5);
+sunLight.position.copy(sunDir).multiplyScalar(500);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.setScalar(TOUCH ? 2048 : 4096);
+Object.assign(sunLight.shadow.camera, { left: -450, right: 450, top: 450, bottom: -450, far: 1200 });
+sunLight.shadow.bias = -0.0004;
+scene.add(sunLight);
+// 影を落とさない同方向の弱い光：丘の影が真っ黒に沈まず、夕陽が回り込んで見える
+const fillLight = new THREE.DirectionalLight(0xffb98a, 0.7);
+fillLight.position.copy(sunLight.position);
+scene.add(fillLight);
+const hemiLight = new THREE.HemisphereLight(0xc4d6f5, 0x7a5638, 1.15); // 夕陽の届かない斜面にも、空の青と地面の照り返し
+scene.add(hemiLight);
+
+// ---------- 地形の高さ関数 ----------
+function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+function noise(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, y) {
+  let v = 0, amp = 0.5, f = 1;
+  for (let i = 0; i < 6; i++) { v += amp * noise(x * f, y * f); f *= 2; amp *= 0.5; }
+  return v;
+}
+const LAKE = { x: -40, z: 30, r: 90 };
+function heightAt(x, z) {
+  // 遠景の山並み（大きく、ゆるやかに）
+  let h = Math.pow(fbm(x * 0.0035, z * 0.0035), 1.6) * 260;
+  // 中景の丘（谷と尾根の筋）
+  h += Math.pow(fbm(x * 0.012 + 40, z * 0.012), 2) * 26;
+  // 細部のざらつき
+  h += (fbm(x * 0.05, z * 0.05) - 0.5) * 2.5;
+  // 湖の盆地：中心に近づくほど水面近くまで沈める
+  const d = Math.hypot(x - LAKE.x, z - LAKE.z);
+  const basin = THREE.MathUtils.smoothstep(d, LAKE.r * 0.55, LAKE.r * 1.25);
+  h = THREE.MathUtils.lerp(CFG.lakeLevel - 3, h, basin);
+  // 手前（カメラ側）は緩やかな草原に
+  const near = THREE.MathUtils.smoothstep(Math.hypot(x + 170, z - 230), 80, 260);
+  h *= THREE.MathUtils.lerp(0.25, 1, near);
+  return h - 6;
+}
+
+// ---------- 地形メッシュ ----------
+const SIZE = 2000, SEG = 360;
+const terrainGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+terrainGeo.rotateX(-Math.PI / 2);
+const pos = terrainGeo.attributes.position;
+for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i)));
+terrainGeo.computeVertexNormals();
+
+const nrm = terrainGeo.attributes.normal;
+const colors = [];
+const cSand  = new THREE.Color('#e6cf9a');
+const cMeadow = new THREE.Color('#9bb35a');  // 夕陽で映える黄緑
+const cForest = new THREE.Color('#4f7a3a');
+const cRock  = new THREE.Color('#8c7460');
+const cSnow  = new THREE.Color('#fbf3ea');
+const tmp = new THREE.Color();
+for (let i = 0; i < pos.count; i++) {
+  const h = pos.getY(i), slope = 1 - nrm.getY(i);
+  tmp.copy(cMeadow);
+  tmp.lerp(cForest, THREE.MathUtils.smoothstep(h, 18, 60));
+  const shore = 1 - THREE.MathUtils.smoothstep(Math.hypot(pos.getX(i) - LAKE.x, pos.getZ(i) - LAKE.z), LAKE.r * 0.9, LAKE.r * 1.15);
+  tmp.lerp(cSand, THREE.MathUtils.smoothstep(h, 4, -1) * shore); // 湖畔の砂地
+  tmp.lerp(cRock, THREE.MathUtils.smoothstep(slope, 0.18, 0.45));
+  tmp.lerp(cSnow, THREE.MathUtils.smoothstep(h, 150, 200));
+  colors.push(tmp.r, tmp.g, tmp.b);
+}
+terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+const terrain = new THREE.Mesh(
+  terrainGeo,
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 })
+);
+terrain.receiveShadow = true;
+scene.add(terrain);
+
+// ---------- 湖（映り込み＋水の色） ----------
+// 映り込みをさざ波でゆらし、岸に近いほど浅瀬の色になじませる
+const WaterShader = {
+  uniforms: {
+    color: { value: null },
+    tDiffuse: { value: null },
+    textureMatrix: { value: null },
+    uTime: { value: 0 },
+  },
+  vertexShader: /* glsl */`
+    uniform mat4 textureMatrix;
+    varying vec4 vUv;
+    varying vec2 vLocal;
+    varying vec3 vWorld;
+    #include <common>
+    #include <logdepthbuf_pars_vertex>
+    void main() {
+      vUv = textureMatrix * vec4(position, 1.0);
+      vLocal = uv;
+      vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader: /* glsl */`
+    uniform vec3 color;
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    varying vec4 vUv;
+    varying vec2 vLocal;
+    varying vec3 vWorld;
+    #include <logdepthbuf_pars_fragment>
+    float blendOverlay(float base, float blend) {
+      return (base < 0.5 ? (2.0 * base * blend) : (1.0 - 2.0 * (1.0 - base) * (1.0 - blend)));
+    }
+    vec3 blendOverlay(vec3 base, vec3 blend) {
+      return vec3(blendOverlay(base.r, blend.r), blendOverlay(base.g, blend.g), blendOverlay(base.b, blend.b));
+    }
+    void main() {
+      #include <logdepthbuf_fragment>
+      vec2 p = vWorld.xz;
+      vec2 ripple = vec2(
+        sin(p.y * 0.35 + uTime * 0.9) + 0.6 * sin(p.x * 0.21 - uTime * 0.6),
+        cos(p.x * 0.30 + uTime * 0.8) + 0.6 * cos(p.y * 0.17 + uTime * 0.5)
+      );
+      vec4 uv = vUv;
+      uv.xy += ripple * 0.0035 * uv.w;
+      vec3 col = blendOverlay(texture2DProj(tDiffuse, uv).rgb, color);
+      float edge = smoothstep(0.9, 1.0, length(vLocal - 0.5) * 2.0);
+      col = mix(col, vec3(0.5, 0.43, 0.32), edge * 0.6);
+      gl_FragColor = vec4(col, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+};
+const lake = new Reflector(new THREE.CircleGeometry(LAKE.r * 0.9, 64), {
+  textureWidth: 1024, textureHeight: 1024, color: 0xa8c4cc, shader: WaterShader,
+});
+lake.rotation.x = -Math.PI / 2;
+lake.position.set(LAKE.x, CFG.lakeLevel, LAKE.z);
+scene.add(lake);
+
+const lakeTint = new THREE.Mesh(
+  new THREE.CircleGeometry(LAKE.r * 0.9, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: 0.06, depthWrite: false })
+);
+lakeTint.rotation.x = -Math.PI / 2;
+lakeTint.position.set(LAKE.x, CFG.lakeLevel + 0.05, LAKE.z);
+scene.add(lakeTint);
+
+// ---------- 木々（風に揺れる） ----------
+const windUniform = { value: 0 };
+const trunkGeo = new THREE.CylinderGeometry(0.35, 0.6, 4, 6); trunkGeo.translate(0, 2, 0);
+const leafGeo = new THREE.ConeGeometry(3.2, 10, 7);            leafGeo.translate(0, 9, 0);
+const trunks = new THREE.InstancedMesh(
+  trunkGeo, new THREE.MeshStandardMaterial({ color: 0x4e3a2a }), CFG.treeCount
+);
+const leafMat = new THREE.MeshStandardMaterial({ roughness: 0.85 });
+leafMat.onBeforeCompile = (shader) => {
+  shader.uniforms.uWind = windUniform;
+  shader.vertexShader = 'uniform float uWind;\n' + shader.vertexShader.replace(
+    '#include <begin_vertex>',
+    `#include <begin_vertex>
+     float swayAmt = max(position.y, 0.0) * 0.035;
+     transformed.x += sin(uWind * 1.6 + position.y * 0.6) * swayAmt;
+     transformed.z += cos(uWind * 1.3 + position.y * 0.5) * swayAmt * 0.6;`
+  );
+};
+const leaves = new THREE.InstancedMesh(leafGeo, leafMat, CFG.treeCount);
+trunks.castShadow = leaves.castShadow = true;
+
+// 見る人の立つ草原と、そこから湖までの視線の通り道には木を植えない
+const VIEW = { x: camera.position.x, z: camera.position.z };
+function distToViewLine(x, z) {
+  const ax = LAKE.x - VIEW.x, az = LAKE.z - VIEW.z;
+  const t = THREE.MathUtils.clamp(((x - VIEW.x) * ax + (z - VIEW.z) * az) / (ax * ax + az * az), 0, 1);
+  return Math.hypot(x - (VIEW.x + ax * t), z - (VIEW.z + az * t));
+}
+
+// 向こう岸の村の跡地（家は水の中にだけ建っている）。木は村の敷地を避けて生える
+const VILLAGE = [];
+for (let i = 0; i < 8; i++) {
+  const a = -1.75 + i * 0.2 + (hash(i, 1) - 0.5) * 0.08;
+  const r = LAKE.r * (1.1 + hash(i, 2) * 0.2);
+  VILLAGE.push({
+    x: LAKE.x + Math.cos(a) * r, z: LAKE.z + Math.sin(a) * r,
+    w: 6 + hash(i, 3) * 3, hgt: 4.5 + hash(i, 4) * 1.5, d: 6,
+  });
+}
+const nearVillage = (x, z) => VILLAGE.some(v => Math.hypot(x - v.x, z - v.z) < 11);
+
+const dummy = new THREE.Object3D();
+const palette = ['#2f5d24', '#3f7330', '#58843c', '#6b8f45', '#8a6a3a'].map(c => new THREE.Color(c));
+let placed = 0;
+for (let tries = 0; tries < CFG.treeCount * 5 && placed < CFG.treeCount; tries++) {
+  const x = (Math.random() - 0.5) * 700;
+  const z = (Math.random() - 0.5) * 700;
+  const h = heightAt(x, z);
+  const dLake = Math.hypot(x - LAKE.x, z - LAKE.z);
+  if (h < 10 || h > 110 || dLake < LAKE.r * 1.05) continue;
+  if (Math.hypot(x - VIEW.x, z - VIEW.z) < 45 || distToViewLine(x, z) < 30 || nearVillage(x, z)) continue;
+  const s = 0.6 + Math.random() * 0.9;
+  dummy.position.set(x, h, z);
+  dummy.rotation.y = Math.random() * Math.PI * 2;
+  dummy.scale.set(s, s * (0.8 + Math.random() * 0.4), s);
+  dummy.updateMatrix();
+  trunks.setMatrixAt(placed, dummy.matrix);
+  leaves.setMatrixAt(placed, dummy.matrix);
+  leaves.setColorAt(placed, palette[Math.floor(Math.random() * palette.length)]);
+  placed++;
+}
+trunks.count = leaves.count = placed;
+scene.add(trunks, leaves);
+
+// ---------- やわらかな光のにじみ（粒・灯り・月で共用） ----------
+function glowTexture(stops) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  stops.forEach(([at, col]) => grd.addColorStop(at, col));
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const glowTex = glowTexture([
+  [0, 'rgba(255,255,255,1)'], [0.25, 'rgba(255,255,255,0.45)'], [1, 'rgba(255,255,255,0)'],
+]);
+
+// ---------- 光の粒（夕陽を受けて漂う花粉） ----------
+const PARTICLES = 1200;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(PARTICLES * 3);
+const pCol = new Float32Array(PARTICLES * 3);
+const moteTones = ['#ffd38a', '#ffc08a', '#fff0d2', '#ffe2a8'].map(c => new THREE.Color(c));
+for (let i = 0; i < PARTICLES; i++) {
+  pPos[i * 3]     = (Math.random() - 0.5) * 500;
+  pPos[i * 3 + 1] = Math.random() * 60 + 2;
+  pPos[i * 3 + 2] = (Math.random() - 0.5) * 500;
+  moteTones[i % moteTones.length].toArray(pCol, i * 3);
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+const moteMat = new THREE.PointsMaterial({
+  map: glowTex, vertexColors: true, size: 1.6, transparent: true, opacity: 0.7,
+  blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+});
+const motes = new THREE.Points(pGeo, moteMat);
+scene.add(motes);
+
+// ---------- 夕雲（地平線近くにたなびく薄い雲） ----------
+function cloudTexture(seed) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 70; i++) {
+    const x = 40 + hash(seed, i) * 432;
+    const y = 64 + (hash(seed, i + 100) - 0.5) * 50 * Math.sin((x / 512) * Math.PI);
+    const r = 14 + hash(seed, i + 200) * 34;
+    const grd = g.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0, 'rgba(255,255,255,0.22)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const clouds = [];
+const cloudNear = new THREE.Color('#ffd9a8'), cloudFar = new THREE.Color('#d9a6b4');
+for (let i = 0; i < 10; i++) {
+  const az = CFG.sunAzimuth - 110 + i * 24 + (hash(i, 7) - 0.5) * 14;
+  const el = 4 + hash(i, 8) * 9;
+  const nearSun = 1 - Math.min(Math.abs(az - CFG.sunAzimuth) / 110, 1);
+  const mat = new THREE.SpriteMaterial({
+    map: cloudTexture(i + 1), transparent: true, depthWrite: false, fog: false,
+    color: cloudFar.clone().lerp(cloudNear, nearSun), opacity: 0.55 + nearSun * 0.4,
+  });
+  const cloud = new THREE.Sprite(mat);
+  cloud.position.setFromSphericalCoords(2600, THREE.MathUtils.degToRad(90 - el), THREE.MathUtils.degToRad(az));
+  cloud.scale.set(900 + hash(i, 9) * 700, 160 + hash(i, 10) * 90, 1);
+  clouds.push({ mat, day: mat.color.clone(), dayOpacity: mat.opacity });
+  scene.add(cloud);
+}
+
+// ---------- 足もとの草（見る人の立つ草原だけ） ----------
+const bladeGeo = new THREE.BufferGeometry();
+bladeGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+  -0.18, 0, 0,  0.18, 0, 0,  -0.1, 0.7, 0,
+   0.18, 0, 0,  0.1, 0.7, 0,  -0.1, 0.7, 0,
+  -0.1, 0.7, 0,  0.1, 0.7, 0,  0, 1.4, 0.15,
+], 3));
+bladeGeo.computeVertexNormals();
+const grassMat = new THREE.MeshStandardMaterial({ roughness: 0.9, side: THREE.DoubleSide });
+grassMat.onBeforeCompile = (shader) => {
+  shader.uniforms.uWind = windUniform;
+  shader.vertexShader = 'uniform float uWind;\n' + shader.vertexShader.replace(
+    '#include <begin_vertex>',
+    `#include <begin_vertex>
+     vec4 gw = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+     float bend = position.y * position.y * 0.25;
+     transformed.x += (sin(uWind * 1.8 + gw.x * 0.15 + gw.z * 0.1) * 0.6 + 0.4) * bend;
+     transformed.z += cos(uWind * 1.4 + gw.z * 0.12) * bend * 0.4;`
+  );
+};
+const GRASS = TOUCH ? 22000 : 45000;
+const grass = new THREE.InstancedMesh(bladeGeo, grassMat, GRASS);
+grass.receiveShadow = true;
+const grassTones = ['#7f9a43', '#93ab4f', '#a9b85a', '#6f8a3c', '#c2b866'].map(c => new THREE.Color(c));
+let blades = 0;
+for (let tries = 0; tries < GRASS * 3 && blades < GRASS; tries++) {
+  const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 150;
+  const x = camera.position.x + Math.cos(a) * rr, z = camera.position.z + Math.sin(a) * rr;
+  if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r * 1.12) continue;
+  const h = heightAt(x, z);
+  if (h < CFG.lakeLevel + 1) continue;
+  const s = 0.4 + Math.random() * 0.5;
+  dummy.position.set(x, h - 0.05, z);
+  dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
+  dummy.scale.set(s, s * (0.8 + Math.random() * 0.6), s);
+  dummy.updateMatrix();
+  grass.setMatrixAt(blades, dummy.matrix);
+  grass.setColorAt(blades, grassTones[Math.floor(Math.random() * grassTones.length)]);
+  blades++;
+}
+grass.count = blades;
+scene.add(grass);
+
+// ---------- 時間の止まった痕跡（かつてここにいた誰かの名残） ----------
+const relics = new THREE.Group();
+scene.add(relics);
+const woodMat  = new THREE.MeshStandardMaterial({ color: 0x6e5440, roughness: 0.9 });
+const stoneMat = new THREE.MeshStandardMaterial({ color: 0x9d9488, roughness: 0.95 });
+const brassMat = new THREE.MeshStandardMaterial({ color: 0xb8893f, roughness: 0.45, metalness: 0.4, side: THREE.DoubleSide });
+const faceMat  = new THREE.MeshStandardMaterial({ color: 0xfff1d6, emissive: 0xffd9a0, emissiveIntensity: 0.25 });
+const handMat  = new THREE.MeshStandardMaterial({ color: 0x3a2a20 });
+
+// 湖の向こう岸の丘に建つ鐘楼：時計の針は止まったまま
+const tower = new THREE.Group();
+const towerBody = new THREE.Mesh(new THREE.CylinderGeometry(4, 5, 26, 10), stoneMat);
+towerBody.position.y = 13;
+// 吹き抜けの鐘室：四本の柱のあいだに鐘が吊られている
+const belfryFloor = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.4, 0.6, 10), stoneMat);
+belfryFloor.position.y = 26.3;
+tower.add(belfryFloor);
+for (let i = 0; i < 4; i++) {
+  const a = i * Math.PI / 2 + Math.PI / 4;
+  const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 6, 0.8), stoneMat);
+  pillar.position.set(Math.cos(a) * 3.5, 29.5, Math.sin(a) * 3.5);
+  tower.add(pillar);
+}
+const towerRoof = new THREE.Mesh(new THREE.ConeGeometry(6, 10, 10), woodMat);
+towerRoof.position.y = 37.5;
+// 鐘は上端を支点に揺れるよう、形を下へずらしておく
+const bell = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.7, 1.6, 2.4, 14, 1, true).translate(0, -1.2, 0),
+  brassMat
+);
+bell.position.y = 32;
+const clockFace = new THREE.Mesh(new THREE.CircleGeometry(1.8, 24), faceMat);
+clockFace.position.set(0, 21, 4.4);
+const hourHand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 0.05).translate(0, 0.45, 0), handMat);
+hourHand.position.z = 0.03;
+const minuteHand = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.5, 0.05).translate(0, 0.65, 0), handMat);
+minuteHand.position.z = 0.04; minuteHand.rotation.z = -1.2;
+clockFace.add(hourHand, minuteHand);
+tower.add(towerBody, towerRoof, bell, clockFace);
+tower.position.set(30, heightAt(30, -95) - 1, -95);
+tower.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+relics.add(tower);
+
+// 止まった風車（羽根は夕方の角度で固定）
+const mill = new THREE.Group();
+const millBody = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 4, 22, 8), woodMat);
+millBody.position.y = 11;
+const millCap = new THREE.Mesh(new THREE.ConeGeometry(3.4, 4, 8), woodMat);
+millCap.position.y = 24;
+const sails = new THREE.Group();
+sails.position.set(0, 21, 2.8);
+for (let i = 0; i < 4; i++) {
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(1.2, 13, 0.25), woodMat);
+  blade.position.y = 6.5;
+  const arm = new THREE.Group();
+  arm.add(blade);
+  arm.rotation.z = i * Math.PI / 2 + 0.4;
+  sails.add(arm);
+}
+mill.add(millBody, millCap, sails);
+const millX = 80, millZ = -30;
+mill.position.set(millX, heightAt(millX, millZ), millZ);
+mill.rotation.y = Math.atan2(camera.position.x - millX, camera.position.z - millZ);
+mill.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+relics.add(mill);
+
+// ---------- 水鏡の向こう側（湖面にだけ映る、来なかった夜の谷） ----------
+// mirrorWorld は湖の映り込みを描くときだけ表示される
+const mirrorWorld = new THREE.Group();
+mirrorWorld.visible = false;
+scene.add(mirrorWorld);
+
+function haloSprite(color, scale, opacity) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex, color, transparent: true, opacity,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  s.scale.setScalar(scale);
+  return s;
+}
+
+// 湖畔の灯籠：岸をぐるりと囲んで、すべてが灯っている
+const LANTERN_N = 12;
+const litGlassMat  = new THREE.MeshStandardMaterial({ color: 0xffe6bf, emissive: 0xff9d45, emissiveIntensity: 2.6 });
+const lanternCapGeo = new THREE.ConeGeometry(1.1, 0.9, 4);
+const flames = []; // 火ごとに揺れ方をずらす
+for (let i = 0; i < LANTERN_N; i++) {
+  const a = (i / LANTERN_N) * Math.PI * 2 + 0.3;
+  const r = LAKE.r * 1.02;
+  const x = LAKE.x + Math.cos(a) * r, z = LAKE.z + Math.sin(a) * r;
+  const y = Math.max(heightAt(x, z), CFG.lakeLevel);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 2.6, 6), woodMat);
+  post.position.set(x, y + 1.3, z);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 1.2), litGlassMat);
+  glass.position.set(x, y + 3.2, z);
+  const cap = new THREE.Mesh(lanternCapGeo, woodMat);
+  cap.position.set(x, y + 4.35, z);
+  cap.rotation.y = Math.PI / 4;
+  post.castShadow = cap.castShadow = true;
+  const halo = haloSprite(0xff9a4a, 12, 0.55);
+  const core = haloSprite(0xffe2b0, 3.5, 0.9);
+  halo.position.set(x, y + 3.2, z);
+  core.position.copy(halo.position);
+  const warm = new THREE.PointLight(0xff9d55, 8, 28, 2);
+  warm.position.set(x, y + 3.5, z);
+  relics.add(post, glass, cap, halo, core, warm);
+  flames.push({ halo: halo.material, core: core.material, light: warm, phase: hash(i, 11) * 100, pos: halo.position.clone() });
+}
+
+// 向こう岸の村：窓に灯りのともる家々（水の中にだけある）
+const houseWallMat = new THREE.MeshStandardMaterial({ color: 0xcdb89a, roughness: 0.9 });
+const houseRoofMat = new THREE.MeshStandardMaterial({ color: 0x6a3b2e, roughness: 0.8 });
+const windowMat = new THREE.MeshBasicMaterial({ color: 0xffbf6e });
+const windowGeo = new THREE.PlaneGeometry(1.1, 1.3);
+const ruinMat = new THREE.MeshStandardMaterial({ color: 0x8a8278, roughness: 1 });
+for (const { x, z, w, hgt, d } of VILLAGE) {
+  const y = heightAt(x, z) - 0.5;
+  const face = Math.atan2(LAKE.x - x, LAKE.z - z); // 窓を湖へ向ける
+
+  // こちらの世界：崩れた石の土台だけが残っている
+  const ruin = new THREE.Group();
+  const sides = [[0, d / 2, w, 0.9], [0, -d / 2, w * 0.55, 0.6], [w / 2, 0, d, 1.2], [-w / 2, 0, d * 0.4, 0.5]];
+  sides.forEach(([sx, sz, len, wallH], k) => {
+    const vertical = k >= 2;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(vertical ? 0.6 : len, wallH, vertical ? len : 0.6), ruinMat);
+    wall.position.set(sx, wallH / 2, sz);
+    wall.castShadow = wall.receiveShadow = true;
+    ruin.add(wall);
+  });
+  ruin.position.set(x, y, z);
+  ruin.rotation.y = face;
+  relics.add(ruin);
+
+  // 水の中の世界：同じ場所に、灯りのともる家が建っている
+  const house = new THREE.Group();
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(w, hgt, d), houseWallMat);
+  walls.position.y = hgt / 2;
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.78, 3.6, 4), houseRoofMat);
+  roof.position.y = hgt + 1.8;
+  roof.rotation.y = Math.PI / 4;
+  house.add(walls, roof);
+  for (const wx of [-w * 0.25, w * 0.25]) {
+    const win = new THREE.Mesh(windowGeo, windowMat);
+    win.position.set(wx, hgt * 0.5, d / 2 + 0.02);
+    house.add(win);
+  }
+  const glow = haloSprite(0xffa04a, 15, 0.6);
+  glow.position.set(0, hgt * 0.5, d / 2 + 1);
+  house.add(glow);
+  house.position.set(x, y, z);
+  house.rotation.y = face;
+  mirrorWorld.add(house);
+}
+
+// 星と月（鐘が鳴るまで、こちらの空には出ない）
+const STARS = 1500;
+const sPos = new Float32Array(STARS * 3);
+for (let i = 0; i < STARS; i++) {
+  const v = new THREE.Vector3().setFromSphericalCoords(
+    3000, Math.acos(Math.random() * 0.95), Math.random() * Math.PI * 2
+  );
+  v.toArray(sPos, i * 3);
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+mirrorWorld.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
+  color: 0xdfe8ff, size: 1.6, sizeAttenuation: false, fog: false,
+  transparent: true, opacity: 0.9, depthWrite: false,
+})));
+
+const moonDir = new THREE.Vector3(controls.target.x - camera.position.x, 0, controls.target.z - camera.position.z)
+  .normalize().multiplyScalar(Math.cos(THREE.MathUtils.degToRad(16)));
+moonDir.y = Math.sin(THREE.MathUtils.degToRad(16));
+const moonPos = moonDir.clone().multiplyScalar(2800).add(camera.position);
+const moonTex = glowTexture([
+  [0, 'rgba(255,255,255,1)'], [0.42, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.25)'], [1, 'rgba(255,255,255,0)'],
+]);
+const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, color: 0xfff4dc, fog: false, depthWrite: false }));
+moon.scale.setScalar(150);
+moon.position.copy(moonPos);
+const moonGlow = haloSprite(0x9fb8ff, 700, 0.35);
+moonGlow.material.fog = false;
+moonGlow.position.copy(moonPos);
+mirrorWorld.add(moonGlow, moon);
+
+// ---------- 黄昏と夜：k = 0 が黄昏、1 が夜 ----------
+// 湖の映り込みはいつも夜（k = 1）。こちらの世界は、鐘が鳴ると少しずつ夜になる
+const NIGHT = {
+  sun: new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 + 4), THREE.MathUtils.degToRad(CFG.sunAzimuth)),
+  fog: new THREE.Color(0x26314a),
+  sunColor: new THREE.Color(0x9fb4e6), sunIntensity: 0.9,   // 月明かり
+  hemiSky: new THREE.Color(0x7088bd), hemiGround: new THREE.Color(0x2a2633), hemiIntensity: 1.2,
+  firefly: new THREE.Color(0.75, 1.25, 0.55),
+  cloud: new THREE.Color(0x3a4566),
+};
+const DAY = {
+  sun: sunDir.clone(), fog: scene.fog.color.clone(), sunColor: sunLight.color.clone(), sunIntensity: sunLight.intensity,
+  hemiSky: hemiLight.color.clone(), hemiGround: hemiLight.groundColor.clone(), hemiIntensity: hemiLight.intensity,
+  fill: fillLight.intensity, lakeTint: lakeTint.material.opacity,
+};
+// 夜の側にだけあるもの（村・星・月）は、夜の深さに合わせて浮かび上がる
+const nightOnly = [];
+mirrorWorld.traverse((o) => {
+  if (o.material && !nightOnly.some(([m]) => m === o.material)) {
+    o.material.transparent = true;
+    nightOnly.push([o.material, o.material.opacity]);
+  }
+});
+let elapsed = 0, worldNight = 0, clockRunning = false, clockTime = 0;
+const lerp = THREE.MathUtils.lerp;
+
+function applyWorld(k, inWater) {
+  mirrorWorld.visible = k > 0.001;
+  for (const [mat, base] of nightOnly) mat.opacity = base * k;
+  su.sunPosition.value.copy(DAY.sun).lerp(NIGHT.sun, k).normalize();
+  scene.fog.color.copy(DAY.fog).lerp(NIGHT.fog, k);
+  sunLight.color.copy(DAY.sunColor).lerp(NIGHT.sunColor, k);
+  sunLight.intensity = lerp(DAY.sunIntensity, NIGHT.sunIntensity, k);
+  fillLight.intensity = lerp(DAY.fill, 0, k);
+  hemiLight.color.copy(DAY.hemiSky).lerp(NIGHT.hemiSky, k);
+  hemiLight.groundColor.copy(DAY.hemiGround).lerp(NIGHT.hemiGround, k);
+  hemiLight.intensity = lerp(DAY.hemiIntensity, NIGHT.hemiIntensity, k);
+  moteMat.color.setRGB(1, 1, 1).lerp(NIGHT.firefly, k);
+  moteMat.size = lerp(1.6, 2.4, k);
+  moteMat.opacity = lerp(0.7, 0.9, k);
+  faceMat.emissiveIntensity = lerp(0.25, 1.6, k);
+  for (const c of clouds) { c.mat.color.copy(c.day).lerp(NIGHT.cloud, k); c.mat.opacity = lerp(c.dayOpacity, 0.5, k); }
+  lakeTint.material.opacity = DAY.lakeTint * (1 - k);
+  // 水の中では、時計はずっと動いている。こちらでは鐘が鳴るまで止まったまま
+  const minute = inWater ? -elapsed * 0.05 : -1.2 - clockTime * 0.05;
+  minuteHand.rotation.z = minute;
+  hourHand.rotation.z = inWater ? minute / 12 : -clockTime * 0.05 / 12;
+  clockFace.updateMatrixWorld(true);
+}
+const renderReflection = lake.onBeforeRender;
+lake.onBeforeRender = function (...args) {
+  applyWorld(1, true);
+  renderReflection.apply(this, args);
+  applyWorld(worldNight, false);
+};
+
+// 砂浜に置き忘れられた傘
+const umbrellaX = LAKE.x + Math.cos(1.2) * LAKE.r * 0.7;
+const umbrellaZ = LAKE.z + Math.sin(1.2) * LAKE.r * 0.7;
+const umbrella = new THREE.Group();
+const umbrellaPole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4, 5), woodMat);
+umbrellaPole.position.y = 2;
+const canopy = new THREE.Mesh(
+  new THREE.ConeGeometry(3.2, 1.8, 10, 1, true),
+  new THREE.MeshStandardMaterial({ color: 0xa4524a, roughness: 0.8, side: THREE.DoubleSide })
+);
+canopy.position.y = 3.6;
+umbrella.add(umbrellaPole, canopy);
+umbrella.position.set(umbrellaX, Math.max(heightAt(umbrellaX, umbrellaZ), CFG.lakeLevel), umbrellaZ);
+umbrella.rotation.set(0.25, 0.8, 0.1);
+umbrella.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+relics.add(umbrella);
+
+// ---------- 妖精（この谷にただ一匹。WASD／矢印で飛ぶ） ----------
+const fairy = new THREE.Group();
+const fairyBody = new THREE.Group();
+fairy.add(fairyBody);
+const dress = new THREE.Mesh(
+  new THREE.ConeGeometry(0.22, 0.55, 12).translate(0, 0.28, 0),
+  new THREE.MeshStandardMaterial({ color: 0xe4f4ff, emissive: 0x8fd0ff, emissiveIntensity: 0.9, roughness: 0.6 })
+);
+const head = new THREE.Mesh(
+  new THREE.SphereGeometry(0.15, 16, 12),
+  new THREE.MeshStandardMaterial({ color: 0xffe6d2, emissive: 0xffd2b0, emissiveIntensity: 0.5 })
+);
+head.position.y = 0.66;
+const hair = new THREE.Mesh(
+  new THREE.SphereGeometry(0.165, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6),
+  new THREE.MeshStandardMaterial({ color: 0xf6dc8a, emissive: 0xc9a040, emissiveIntensity: 0.6 })
+);
+hair.position.set(0, 0.68, -0.02);
+hair.rotation.x = -0.35;
+fairyBody.add(dress, head, hair);
+
+// 羽：細長い楕円を二枚ずつ、背中から生やす
+const wingShape = new THREE.Shape();
+wingShape.absellipse(0.32, 0, 0.34, 0.14, 0, Math.PI * 2);
+const wingMat = new THREE.MeshBasicMaterial({
+  color: 0xbfeaff, transparent: true, opacity: 0.45, side: THREE.DoubleSide,
+  depthWrite: false, blending: THREE.AdditiveBlending,
+});
+const wings = [];
+for (const side of [1, -1]) {
+  for (const [tilt, size] of [[0.45, 1], [-0.35, 0.7]]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(0, 0.48, -0.08);
+    const wing = new THREE.Mesh(new THREE.ShapeGeometry(wingShape), wingMat);
+    wing.scale.set(side * size, size, 1);
+    wing.rotation.z = side * tilt;
+    pivot.add(wing);
+    fairyBody.add(pivot);
+    wings.push({ pivot, side });
+  }
+}
+
+const fairyHalo = haloSprite(0xbfe6ff, 4.5, 0.8);
+fairyHalo.position.y = 0.45;
+const fairyCore = haloSprite(0xffffff, 0.9, 0.9);
+fairyCore.position.y = 0.45;
+const fairyLight = new THREE.PointLight(0xbfe4ff, 6, 18, 2);
+fairyLight.position.y = 0.5;
+fairy.add(fairyHalo, fairyCore, fairyLight);
+
+const fairyStart = new THREE.Vector3().lerpVectors(camera.position, controls.target, 0.22);
+fairyStart.y = heightAt(fairyStart.x, fairyStart.z) + 3;
+fairy.position.copy(fairyStart);
+scene.add(fairy);
+
+// 通ったあとに残る光の粉
+const DUST = 260;
+const dustPos = new Float32Array(DUST * 3), dustCol = new Float32Array(DUST * 3);
+const dustLife = new Float32Array(DUST), dustVel = new Float32Array(DUST * 3);
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+dustGeo.setAttribute('color', new THREE.BufferAttribute(dustCol, 3));
+scene.add(new THREE.Points(dustGeo, new THREE.PointsMaterial({
+  map: glowTex, vertexColors: true, size: 0.5, transparent: true,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+})));
+let dustNext = 0, dustTimer = 0;
+const dustTint = new THREE.Color(0xd8f2ff);
+
+// 入力：キーボードと、タッチ端末用の画面上のパッド
+const keys = new Set();
+const KEYMAP = {
+  KeyW: 'fwd', ArrowUp: 'fwd', KeyS: 'back', ArrowDown: 'back',
+  KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
+  Space: 'up', KeyE: 'up', ShiftLeft: 'down', ShiftRight: 'down', KeyQ: 'down',
+};
+addEventListener('keydown', (e) => {
+  const k = KEYMAP[e.code];
+  if (!k) return;
+  e.preventDefault();
+  keys.add(k);
+});
+addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) keys.delete(k); });
+addEventListener('blur', () => keys.clear());
+document.querySelectorAll('#pad [data-k]').forEach((btn) => {
+  const k = btn.dataset.k;
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // 視点のドラッグと混ざらないように
+    try { btn.setPointerCapture(e.pointerId); } catch { /* 指がすでに離れている */ }
+    keys.add(k);
+    btn.classList.add('held');
+    startAudio();
+  });
+  const release = () => { keys.delete(k); btn.classList.remove('held'); };
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.addEventListener(ev, release);
+});
+// 長押しでメニューや文字選択が出ないように
+document.getElementById('pad').addEventListener('contextmenu', (e) => e.preventDefault());
+
+const fairyVel = new THREE.Vector3();
+const camFwd = new THREE.Vector3(), camRight = new THREE.Vector3(), wish = new THREE.Vector3();
+const prevTarget = new THREE.Vector3();
+let following = false, zoomIn = false;
+let followDist = 22;
+
+function updateFairy(t, dt) {
+  // カメラの向きを基準に、前後左右を決める
+  camera.getWorldDirection(camFwd);
+  camFwd.y = 0; camFwd.normalize();
+  camRight.crossVectors(camFwd, camera.up).normalize();
+  wish.set(0, 0, 0);
+  if (keys.has('fwd')) wish.add(camFwd);
+  if (keys.has('back')) wish.sub(camFwd);
+  if (keys.has('right')) wish.add(camRight);
+  if (keys.has('left')) wish.sub(camRight);
+  if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(22);
+  if (keys.has('up')) wish.y += 12;
+  if (keys.has('down')) wish.y -= 12;
+
+  if (keys.size) {
+    controls.autoRotate = false;
+    lastTouch = t;
+    if (!following) { following = true; zoomIn = true; }
+  }
+
+  fairyVel.lerp(wish, 1 - Math.exp(-dt * 3));
+  fairy.position.addScaledVector(fairyVel, dt);
+
+  // 地面（湖面）すれすれより下、空の高すぎる所、谷の外へは出ない
+  const ground = Math.max(heightAt(fairy.position.x, fairy.position.z), CFG.lakeLevel) + 0.8;
+  fairy.position.y = THREE.MathUtils.clamp(fairy.position.y, ground, 140);
+  fairy.position.x = THREE.MathUtils.clamp(fairy.position.x, -600, 600);
+  fairy.position.z = THREE.MathUtils.clamp(fairy.position.z, -600, 600);
+
+  // 進む向きへ体を向け、速さに応じて少し前に傾く
+  const speed = Math.hypot(fairyVel.x, fairyVel.z);
+  if (speed > 0.5) {
+    const yaw = Math.atan2(fairyVel.x, fairyVel.z);
+    let dy = yaw - fairy.rotation.y;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    fairy.rotation.y += dy * (1 - Math.exp(-dt * 6));
+  }
+  fairyBody.rotation.x = THREE.MathUtils.lerp(fairyBody.rotation.x, Math.min(speed / 22, 1) * 0.5, 1 - Math.exp(-dt * 4));
+  fairyBody.position.y = Math.sin(t * 2.2) * 0.12;
+
+  // はばたき：速く飛ぶほど速く
+  const flap = Math.sin(t * (14 + speed * 0.6)) * 0.6;
+  for (const w of wings) w.pivot.rotation.y = w.side * (0.35 + flap);
+  fairyHalo.material.opacity = 0.7 + Math.sin(t * 3.1) * 0.1;
+
+  // 光の粉をこぼす
+  dustTimer += dt * (6 + speed * 1.5);
+  while (dustTimer > 1) {
+    dustTimer -= 1;
+    const i = dustNext; dustNext = (dustNext + 1) % DUST;
+    dustPos[i * 3] = fairy.position.x + (Math.random() - 0.5) * 0.3;
+    dustPos[i * 3 + 1] = fairy.position.y + fairyBody.position.y + 0.4;
+    dustPos[i * 3 + 2] = fairy.position.z + (Math.random() - 0.5) * 0.3;
+    dustVel[i * 3] = (Math.random() - 0.5) * 0.4;
+    dustVel[i * 3 + 1] = -0.3 - Math.random() * 0.4;
+    dustVel[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+    dustLife[i] = 1;
+  }
+  for (let i = 0; i < DUST; i++) {
+    if (dustLife[i] <= 0) continue;
+    dustLife[i] = Math.max(dustLife[i] - dt * 0.6, 0);
+    for (let k = 0; k < 3; k++) dustPos[i * 3 + k] += dustVel[i * 3 + k] * dt;
+    const l = dustLife[i] * dustLife[i];
+    dustCol[i * 3] = dustTint.r * l; dustCol[i * 3 + 1] = dustTint.g * l; dustCol[i * 3 + 2] = dustTint.b * l;
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+  dustGeo.attributes.color.needsUpdate = true;
+
+  // 動かしはじめたら、カメラは妖精を追いかける（回転・ズームは自由なまま）
+  if (following) {
+    prevTarget.copy(controls.target);
+    controls.target.lerp(fairy.position, 1 - Math.exp(-dt * 4));
+    camera.position.add(prevTarget.sub(controls.target).negate());
+    if (zoomIn) {
+      const off = camera.position.clone().sub(controls.target);
+      const d = off.length();
+      const nd = THREE.MathUtils.lerp(d, followDist, 1 - Math.exp(-dt * 1.5));
+      camera.position.copy(controls.target).addScaledVector(off.normalize(), nd);
+      if (Math.abs(nd - followDist) < 0.5) zoomIn = false;
+    }
+  }
+}
+controls.addEventListener('start', () => { zoomIn = false; }); // ホイールやドラッグを優先する
+
+// ---------- 物語：記憶のかけらと、鳴らない鐘 ----------
+const storyEl = document.getElementById('story');
+const progressEl = document.getElementById('progress');
+const lines = [];
+let speaking = false;
+// 文を順に一つずつ浮かべる。関数を混ぜると、その順番で実行される
+function narrate(...items) {
+  lines.push(...items);
+  if (!speaking) nextLine();
+}
+function nextLine() {
+  const item = lines.shift();
+  if (item === undefined) { speaking = false; return; }
+  if (typeof item === 'function') { item(); nextLine(); return; }
+  speaking = true;
+  storyEl.textContent = item;
+  storyEl.classList.add('on');
+  setTimeout(() => {
+    storyEl.classList.remove('on');
+    setTimeout(nextLine, 1400);
+  }, 2600 + item.length * 110);
+}
+
+const nearestLantern = flames.reduce((a, b) => (a.pos.distanceTo(fairyStart) < b.pos.distanceTo(fairyStart) ? a : b));
+const ruinSite = VILLAGE[3];
+const millFront = new THREE.Vector3(LAKE.x - millX, 0, LAKE.z - millZ).normalize().multiplyScalar(7);
+let millSpeed = 0, millTarget = 0;
+
+const MEMORIES = [
+  {
+    pos: nearestLantern.pos.clone().add(new THREE.Vector3(0, 3.5, 0)),
+    text: ['灯籠に火を入れるのは、子どもたちの役目だった。', '「夜が、迷わずに来られるように」って。'],
+  },
+  {
+    pos: umbrella.position.clone().add(new THREE.Vector3(0, 6, 0)),
+    text: ['赤い傘は、あの子のお気に入りだった。', '「あした、取りに来るね」。それが最後の約束。'],
+  },
+  {
+    pos: new THREE.Vector3(ruinSite.x, heightAt(ruinSite.x, ruinSite.z) + 3, ruinSite.z),
+    text: ['ここは、パン屋だった。', '夕暮れになると、窓から甘い湯気がこぼれていた。'],
+  },
+  {
+    pos: mill.position.clone().add(millFront).add(new THREE.Vector3(0, 4, 0)),
+    text: ['風車は、夜の風で回るのだと教わった。', () => { millTarget = 0.35; }, '……風が、少しだけ戻ってきた。'],
+  },
+];
+
+const beamGeo = new THREE.CylinderGeometry(0.25, 0.7, 70, 10, 1, true).translate(0, 35, 0);
+function lightBeam(color, opacity) {
+  return new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity, fog: false, side: THREE.DoubleSide,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+}
+const orbs = MEMORIES.map((m) => {
+  const group = new THREE.Group();
+  const glow = haloSprite(0xffe8b8, 6, 0.8);
+  const core = haloSprite(0xffffff, 1.6, 1);
+  const beam = lightBeam(0xffe2a8, 0.1);
+  group.add(glow, core, beam);
+  group.position.copy(m.pos);
+  scene.add(group);
+  return { ...m, group, glow, beam, state: 'idle', t: 0 };
+});
+
+// 鐘楼：すべてのかけらが揃うと、鐘へ導く光が立つ
+const bellWorld = tower.position.clone().add(new THREE.Vector3(0, 30.5, 0));
+const towerBeam = lightBeam(0xffd27a, 0);
+towerBeam.position.copy(bellWorld);
+scene.add(towerBeam);
+
+let found = 0, bellReady = false, bellRung = false, lastRefusal = -99, bellSwing = 0, nightProgress = 0;
+function showProgress() {
+  progressEl.innerHTML = '記憶 ' + MEMORIES.map((_, i) => (i < found ? '<b>●</b>' : '○')).join('');
+}
+showProgress();
+
+function collect(o) {
+  o.state = 'flying';
+  found++;
+  showProgress();
+  audio?.chime(found - 1);
+  // かけらを抱くたび、妖精の光が少し強く、あたたかくなる
+  fairyLight.intensity += 1.5;
+  fairyHalo.scale.addScalar(0.5);
+  dustTint.lerp(new THREE.Color(0xffe2a8), 0.25);
+  narrate(...o.text);
+  if (found === MEMORIES.length) {
+    narrate('すべてのかけらが、ここにある。', () => { bellReady = true; }, '鐘楼へ。止まった鐘のところへ。');
+  }
+}
+
+function ringTheBell() {
+  bellRung = true;
+  bellSwing = 0.6;
+  clockRunning = true;
+  audio?.bellClear();
+  setTimeout(() => audio?.nightfall(), 3500);
+  progressEl.style.opacity = 0;
+  following = true; followDist = 55; zoomIn = true;  // 夜が来るのを見わたせるよう、少し引く
+  narrate(
+    '鐘が鳴った。',
+    '時を止めていたのは、わたしだった。',
+    '夜が来れば、みんなのいない夜になってしまうと思ったから。',
+    'けれど、水の底の夜には、ずっと灯りがともっていた。',
+    '待っていたのは、わたしだけじゃなかった。',
+    '——おかえりなさい。',
+  );
+}
+
+function updateStory(t, dt) {
+  for (const o of orbs) {
+    if (o.state === 'idle') {
+      o.group.position.y = o.pos.y + Math.sin(t * 1.5 + o.pos.x) * 0.4;
+      o.glow.material.opacity = 0.6 + Math.sin(t * 2 + o.pos.z) * 0.2;
+      if (fairy.position.distanceTo(o.group.position) < 4.5) collect(o);
+    } else if (o.state === 'flying') {
+      // 妖精の胸へ吸いこまれていく
+      o.t += dt / 0.9;
+      o.group.position.lerp(fairy.position, 1 - Math.exp(-dt * 8));
+      o.group.scale.setScalar(Math.max(1 - o.t, 0.01));
+      o.beam.material.opacity = 0.1 * Math.max(1 - o.t * 2, 0);
+      if (o.t >= 1) { o.state = 'done'; scene.remove(o.group); }
+    }
+  }
+
+  const nearBell = fairy.position.distanceTo(bellWorld) < 7;
+  if (bellReady && !bellRung) {
+    towerBeam.material.opacity = 0.14 + Math.sin(t * 2) * 0.05;
+    if (nearBell) ringTheBell();
+  } else {
+    towerBeam.material.opacity = Math.max(towerBeam.material.opacity - dt * 0.1, 0);
+    if (!bellReady && nearBell && t - lastRefusal > 15) {
+      lastRefusal = t;
+      narrate('鐘は、まだ鳴らない。', '谷に残る記憶のかけらを、集めなければ。');
+    }
+  }
+
+  // 鐘の揺れ、時計、夜の訪れ
+  bell.rotation.z = Math.sin(t * 3.2) * bellSwing;
+  bellSwing *= Math.exp(-dt * 0.25);
+  if (clockRunning) clockTime += dt;
+  if (bellRung && nightProgress < 1) {
+    nightProgress = Math.min(nightProgress + dt / 26, 1);
+    worldNight = THREE.MathUtils.smootherstep(nightProgress, 0, 1);
+  }
+  millSpeed = lerp(millSpeed, millTarget, 1 - Math.exp(-dt * 0.5));
+  sails.rotation.z -= millSpeed * dt;
+}
+
+setTimeout(() => {
+  if (found === 0) narrate('谷のあちこちに、光るかけらが残っている。', '妖精を飛ばして、拾い集めよう。');
+}, 10500);
+
+// ---------- 音（最初に触れたときから鳴りはじめる） ----------
+// 風の音と、ときおり水の底から聞こえてくる鐘。すべてその場で合成する
+const soundBtn = document.getElementById('sound');
+let audio = null, soundOn = true;
+function startAudio() {
+  if (audio) return;
+  const ctx = new AudioContext();
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0, ctx.currentTime);
+  master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 5);
+  master.connect(ctx.destination);
+
+  // 風：ゆっくり強弱する帯域ノイズ
+  const noise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+  const data = noise.getChannelData(0);
+  for (let i = 0, last = 0; i < data.length; i++) {
+    last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; // 赤みがかったノイズ
+    data[i] = last * 3.5;
+  }
+  const wind = ctx.createBufferSource();
+  wind.buffer = noise; wind.loop = true;
+  const windFilter = ctx.createBiquadFilter();
+  windFilter.type = 'bandpass'; windFilter.frequency.value = 420; windFilter.Q.value = 0.6;
+  const windGain = ctx.createGain();
+  windGain.gain.value = 0.22;
+  const gust = ctx.createOscillator(), gustDepth = ctx.createGain();
+  gust.frequency.value = 0.07; gustDepth.gain.value = 0.12;
+  gust.connect(gustDepth).connect(windGain.gain);
+  wind.connect(windFilter).connect(windGain).connect(master);
+  wind.start(); gust.start();
+
+  // 鐘：水を通したようにくぐもった、長い余韻
+  const bellFilter = ctx.createBiquadFilter();
+  bellFilter.type = 'lowpass'; bellFilter.frequency.value = 900;
+  const echo = ctx.createDelay(2); echo.delayTime.value = 0.42;
+  const echoGain = ctx.createGain(); echoGain.gain.value = 0.35;
+  bellFilter.connect(master);
+  bellFilter.connect(echo).connect(echoGain).connect(echo);
+  echoGain.connect(master);
+  // 澄んだ音の行き先：そのまま＋こだま
+  const clear = ctx.createGain();
+  clear.connect(master);
+  clear.connect(echo);
+
+  function strike(dest, gain, length, when = 0) {
+    const now = ctx.currentTime + when;
+    [[1, 0.5], [2.76, 0.22], [5.4, 0.12], [8.93, 0.06]].forEach(([ratio, amp]) => {
+      const osc = ctx.createOscillator(), env = ctx.createGain();
+      osc.frequency.value = 174.6 * ratio;
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(amp * gain, now + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + length / Math.sqrt(ratio));
+      osc.connect(env).connect(dest);
+      osc.start(now); osc.stop(now + length + 1);
+    });
+  }
+  // 水の底の鐘は、こちらの鐘が鳴るまで聞こえつづける
+  function ringUnderwater() {
+    if (clockRunning) return;
+    strike(bellFilter, 0.35, 9);
+    setTimeout(ringUnderwater, 28000 + Math.random() * 22000);
+  }
+  setTimeout(ringUnderwater, 6000);
+
+  // 記憶のかけらを拾う音：拾うたびに音階をひとつ上がる
+  function chime(n) {
+    const notes = [523.25, 587.33, 659.25, 783.99, 880];
+    const now = ctx.currentTime;
+    for (const [mul, amp] of [[1, 0.12], [2, 0.04], [3.01, 0.015]]) {
+      const osc = ctx.createOscillator(), env = ctx.createGain();
+      osc.frequency.value = notes[n % notes.length] * mul;
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(amp, now + 0.01);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+      osc.connect(env).connect(clear);
+      osc.start(now); osc.stop(now + 3);
+    }
+  }
+
+  // 鐘楼の鐘：三度、澄んだ音で
+  function bellClear() {
+    for (let i = 0; i < 3; i++) strike(clear, 0.9, 14, i * 3.4);
+  }
+
+  // 夜：やわらかな和音と、虫の声
+  function nightfall() {
+    const padFilter = ctx.createBiquadFilter();
+    padFilter.type = 'lowpass'; padFilter.frequency.value = 1100;
+    const pad = ctx.createGain();
+    pad.gain.setValueAtTime(0, ctx.currentTime);
+    pad.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 14);
+    padFilter.connect(pad).connect(master);
+    pad.connect(echo);
+    for (const f of [174.61, 220, 261.63, 392, 440]) {
+      for (const detune of [-6, 6]) {
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = f;
+        osc.detune.value = detune;
+        osc.connect(padFilter);
+        osc.start();
+      }
+    }
+    const cricket = () => {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator(), env = ctx.createGain();
+      osc.frequency.value = 4300 + Math.random() * 500;
+      env.gain.setValueAtTime(0, now);
+      for (let p = 0; p < 3; p++) {
+        env.gain.linearRampToValueAtTime(0.012, now + p * 0.07 + 0.01);
+        env.gain.linearRampToValueAtTime(0, now + p * 0.07 + 0.045);
+      }
+      osc.connect(env).connect(master);
+      osc.start(now); osc.stop(now + 0.3);
+      setTimeout(cricket, 700 + Math.random() * 1600);
+    };
+    setTimeout(cricket, 6000);
+  }
+
+  audio = { ctx, master, chime, bellClear, nightfall };
+  soundBtn.hidden = false;
+}
+addEventListener('pointerdown', startAudio, { once: true });
+addEventListener('keydown', startAudio, { once: true });
+// iPhone などでは、指を離した瞬間にしか音を出す許可が下りないことがある
+for (const ev of ['touchend', 'click']) {
+  addEventListener(ev, () => { if (audio && audio.ctx.state !== 'running') audio.ctx.resume(); }, { passive: true });
+}
+soundBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+soundBtn.addEventListener('click', () => {
+  if (!audio) return;
+  soundOn = !soundOn;
+  audio.master.gain.setTargetAtTime(soundOn ? 0.5 : 0, audio.ctx.currentTime, 0.3);
+  soundBtn.textContent = soundOn ? '音：あり' : '音：なし';
+  soundBtn.setAttribute('aria-pressed', String(soundOn));
+});
+
+// ---------- しばらく触れずにいると、視点がゆっくり谷を巡る ----------
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let lastTouch = 0;
+controls.autoRotateSpeed = -0.12;
+controls.addEventListener('start', () => { controls.autoRotate = false; lastTouch = clock.getElapsedTime(); });
+controls.addEventListener('end', () => { lastTouch = clock.getElapsedTime(); });
+
+// ---------- リサイズ・ループ ----------
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+let lastT = 0;
+renderer.setAnimationLoop(() => {
+  const t = clock.getElapsedTime();
+  const dt = Math.min(t - lastT, 0.05);
+  lastT = t;
+  windUniform.value = t;
+  updateFairy(t, dt);
+  updateStory(t, dt);
+  applyWorld(worldNight, false);
+  elapsed = t;
+
+  // 光の粒をゆっくり漂わせる
+  const arr = pGeo.attributes.position.array;
+  for (let i = 0; i < PARTICLES; i++) {
+    arr[i * 3]     += Math.sin(t * 0.3 + i) * 0.02;
+    arr[i * 3 + 1] += Math.cos(t * 0.2 + i * 0.7) * 0.01;
+    if (arr[i * 3 + 1] > 65) arr[i * 3 + 1] = 2;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+
+  // 灯籠の火が、かすかに揺れる
+  for (const f of flames) {
+    const ft = t + f.phase;
+    const flicker = Math.sin(ft * 2.3) * 0.08 + Math.sin(ft * 5.7) * 0.05 + Math.sin(ft * 13.1) * 0.02;
+    f.halo.opacity = 0.55 + flicker;
+    f.core.opacity = 0.9 + flicker * 0.5;
+    f.light.intensity = 8 + flicker * 12;
+  }
+
+  lake.material.uniforms.uTime.value = t;
+  if (!reduceMotion && !controls.autoRotate && t - lastTouch > 25) controls.autoRotate = true;
+
+  controls.update();
+  // カメラが地面にもぐらないように
+  const floor = Math.max(heightAt(camera.position.x, camera.position.z), CFG.lakeLevel) + 1.5;
+  if (camera.position.y < floor) camera.position.y = floor;
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

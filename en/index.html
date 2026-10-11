@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>The Valley of Endless Dusk</title>
+<meta name="description" content="Night stopped coming to this valley. Only the lake still holds it. Become a fairy and gather the memories left behind, in a short story you can play in your browser in about six minutes.">
+<link rel="canonical" href="https://futurecortexlabs.github.io/FCTX_Beautiful_Scenery/en/">
+<link rel="alternate" hreflang="ja" href="https://futurecortexlabs.github.io/FCTX_Beautiful_Scenery/">
+<link rel="alternate" hreflang="en" href="https://futurecortexlabs.github.io/FCTX_Beautiful_Scenery/en/">
+<!-- The card shown when the link is shared -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="The Valley of Endless Dusk">
+<meta property="og:title" content="The Valley of Endless Dusk">
+<meta property="og:description" content="Night never comes to this valley. Except beneath the water. Become a fairy and gather the memories left behind, in a six-minute browser story.">
+<meta property="og:url" content="https://futurecortexlabs.github.io/FCTX_Beautiful_Scenery/en/">
+<meta property="og:image" content="https://futurecortexlabs.github.io/FCTX_Beautiful_Scenery/en/og.jpg">
+<meta property="og:image:alt" content="A lake in a golden dusk valley, reflecting a night sky of stars and a moon">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The Valley of Endless Dusk">
+<meta name="twitter:description" content="Night never comes to this valley. Except beneath the water.">
+<meta name="twitter:image" content="https://futurecortexlabs.github.io/FCTX_Beautiful_Scenery/en/og.jpg">
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="../style.css">
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div class="bar top"></div><div class="bar bottom"></div>
+<div id="story" role="status" aria-live="polite"></div>
+<div id="progress" aria-label="Memory fragments gathered"></div>
+<div id="title" aria-hidden="true">
+  <h1>The Valley of Endless Dusk</h1>
+  <p id="title-sub">— The End —</p>
+</div>
+<div id="credits" aria-hidden="true"><div class="roll">
+  <p class="big">The Valley of Endless Dusk</p>
+  <p><span>The Fairy</span>You</p>
+  <p><span>The Child</span>From the night beneath the water</p>
+  <p><span>The Villagers</span>Behind the glowing windows</p>
+  <p><span>Sound</span>Wind across the valley, a bell, and crickets</p>
+  <p><span>Made by</span>FutureCortex Labs</p>
+  <p class="big" style="margin-top:22vh">Thank you for watching.</p>
+</div></div>
+<div id="fade"></div>
+<div id="start">
+  <a id="lang" href="../" hreflang="ja" lang="ja">日本語</a>
+  <h1>The Valley of Endless Dusk</h1>
+  <p>A short story of one valley and one fairy</p>
+  <button id="begin" type="button">Begin</button>
+  <small>Sound on　/　About 6 minutes</small>
+</div>
+<button id="skip" type="button" hidden>Skip ›</button>
+<div id="pad" aria-label="Fairy controls">
+  <div class="dir">
+    <button type="button" data-k="fwd" style="grid-area:f" aria-label="Forward">▲</button>
+    <button type="button" data-k="left" style="grid-area:l" aria-label="Left">◀</button>
+    <button type="button" data-k="right" style="grid-area:r" aria-label="Right">▶</button>
+    <button type="button" data-k="back" style="grid-area:b" aria-label="Back">▼</button>
+  </div>
+  <div class="alt">
+    <button type="button" data-k="up" aria-label="Rise" style="font-size:13px">Up</button>
+    <button type="button" data-k="down" aria-label="Descend" style="font-size:13px">Down</button>
+  </div>
+</div>
+<button id="sound" type="button" aria-pressed="true" hidden>Sound: on</button>
+<script type="module" src="../app.js"></script>
+</body>
+</html>

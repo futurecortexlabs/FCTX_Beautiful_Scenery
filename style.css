@@ -1,0 +1,81 @@
+html,body{margin:0;height:100%;overflow:hidden;background:#000}
+:root{--mincho:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif}
+/* 英語版：本の活字のような書体に、字間は控えめに */
+:root:lang(en){--mincho:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif}
+:lang(en) #story{letter-spacing:.03em}
+:lang(en) #title h1,:lang(en) #start h1{letter-spacing:.08em}
+:lang(en) #start p,:lang(en) #credits p,:lang(en) #title p{letter-spacing:.12em}
+:lang(en) #start button{letter-spacing:.25em}
+:lang(en) #progress{letter-spacing:.15em}
+#lang{position:absolute;top:calc(16px + env(safe-area-inset-top));right:20px;color:#fff3dc99;font:12px var(--mincho);
+  letter-spacing:.15em;text-decoration:none;border-bottom:1px solid #fff3;padding-bottom:2px}
+#lang:hover,#lang:focus-visible{color:#fff8ec;outline:none}
+#sound{position:fixed;right:16px;bottom:10px;padding:4px 12px;border:1px solid #fff4;border-radius:999px;
+  background:#0003;color:#fffc;font:13px sans-serif;cursor:pointer;backdrop-filter:blur(4px)}
+#sound:hover{background:#0005}
+#pad{display:none;position:fixed;left:0;right:0;bottom:calc(44px + env(safe-area-inset-bottom));
+  padding:0 max(16px, env(safe-area-inset-left)) 0 max(16px, env(safe-area-inset-right));justify-content:space-between;
+  align-items:flex-end;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#pad .dir{display:grid;grid-template-areas:". f ." "l . r" ". b .";grid-template-columns:repeat(3,56px);grid-auto-rows:56px;gap:4px}
+#pad .alt{display:grid;gap:12px}
+#pad button{pointer-events:auto;width:56px;height:56px;border-radius:50%;border:1px solid #fff6;
+  background:#0004;color:#fffd;font:17px sans-serif;backdrop-filter:blur(4px);touch-action:none;
+  -webkit-user-select:none;user-select:none}
+#pad button.held{background:#fff4;border-color:#fffa}
+@media (pointer:coarse){
+  #pad{display:flex}
+  #progress{top:calc(12px + env(safe-area-inset-top))}
+  /* 物語の文は画面の真ん中に。妖精がちょうど中央にいるので、ほんの少しだけ上へ */
+  #story{bottom:auto;top:40%;transform:translateY(-50%)}
+  #sound{bottom:calc(8px + env(safe-area-inset-bottom))}
+}
+#story{position:fixed;left:16px;right:16px;bottom:22%;text-align:center;pointer-events:none;
+  color:#fff8ec;font:300 clamp(15px,2vw,22px)/1.9 var(--mincho);
+  letter-spacing:.18em;text-shadow:0 1px 3px #000a,0 2px 22px #000c;opacity:0;transition:opacity 1.2s ease;
+  word-break:auto-phrase;text-wrap:balance}
+#story.on{opacity:1}
+#story.fairy{color:#d4ebff}   /* 妖精自身のことば */
+#story.child{color:#ffd6dc}   /* あの子のことば */
+#title{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  pointer-events:none;opacity:0;transition:opacity 3s ease;text-align:center;padding:0 16px;
+  color:#fff8ec;font-family:var(--mincho);text-shadow:0 2px 24px #000c}
+#title.on{opacity:1}
+#title h1{margin:0;font-weight:300;font-size:clamp(24px,5vw,46px);letter-spacing:.3em}
+#title p{margin:0;font-size:clamp(13px,1.6vw,16px);letter-spacing:.25em;color:#fff3dccc}
+#progress{position:fixed;right:16px;top:12px;color:#fff3dccc;font:13px var(--mincho);
+  letter-spacing:.3em;text-shadow:0 1px 4px #000;transition:opacity 2s}
+#progress b{font-weight:normal;color:#ffe2a8}
+
+/* ---- 映画のような演出 ---- */
+/* 上下の黒帯：場面のあいだだけ降りてくる */
+.bar{position:fixed;left:0;right:0;height:0;background:#000;z-index:4;transition:height 1.4s cubic-bezier(.6,0,.2,1);pointer-events:none}
+.bar.top{top:0}.bar.bottom{bottom:0}
+body.cinema .bar{height:12vh}
+body.cinema #progress,body.cinema #pad,body.cinema #sound{opacity:0;visibility:hidden}
+/* 場面のあいだの字幕は、下の黒帯の中に */
+body.cinema #story{top:auto;bottom:calc(6vh - .95em);transform:none;z-index:5;font-size:clamp(14px,1.8vw,20px)}
+/* 暗転 */
+#fade{position:fixed;inset:0;background:#000;z-index:6;opacity:0;pointer-events:none;transition:opacity 1.1s ease}
+#fade.on{opacity:1;transition-duration:.01s}
+/* 幕開けの画面 */
+#start{position:fixed;inset:0;z-index:8;background:#000;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:18px;text-align:center;padding:0 16px;color:#fff8ec;font-family:var(--mincho);transition:opacity 2s}
+#start.gone{opacity:0;pointer-events:none}
+#start h1{margin:0;font-weight:300;font-size:clamp(24px,5vw,44px);letter-spacing:.3em}
+#start p{margin:0;color:#fff3dc99;letter-spacing:.3em;font-size:13px}
+#start button{margin-top:26px;padding:10px 34px;border:1px solid #fff6;border-radius:999px;background:none;
+  color:#fff8ec;font:15px var(--mincho);letter-spacing:.4em;cursor:pointer}
+#start button:hover,#start button:focus-visible{background:#fff1;outline:none;border-color:#fffc}
+#start small{color:#fff3dc66;font-size:11px;letter-spacing:.2em}
+#skip{position:fixed;right:16px;top:calc(12vh + 10px);z-index:5;padding:4px 14px;border:1px solid #fff4;border-radius:999px;
+  background:#0004;color:#fffb;font:12px sans-serif;letter-spacing:.2em;cursor:pointer}
+/* エンドロール */
+#credits{position:fixed;left:0;right:0;top:12vh;bottom:12vh;z-index:5;overflow:hidden;pointer-events:none;
+  color:#fff8ec;font-family:var(--mincho);text-align:center;text-shadow:0 2px 16px #000c}
+#credits .roll{position:absolute;left:0;right:0;top:100%}
+#credits.on .roll{animation:roll 34s linear forwards}
+@keyframes roll{to{transform:translateY(calc(-100% - 76vh))}}
+#credits p{margin:0 0 7vh;letter-spacing:.3em;font-size:clamp(13px,1.6vw,17px)}
+#credits p span{display:block;margin-bottom:6px;font-size:.75em;color:#fff3dc99}
+#credits p.big{font-size:clamp(20px,3.4vw,32px);font-weight:300}
